@@ -6,4 +6,12 @@ Assignments completed during the compilers lab course during my 5th semester (Au
 
 
 
-The objective of the lab was to build a toy compiler for TinyC. Multiple assignments are the intermediate steps: Lexes, Parser, Machine Independent Code Translation and Target Code generation. There are README's present in each of the assignment folders
+The objective of the lab was to build a toy compiler for TinyC. Each assignment is an intermediate step in the process
+
+- Assignment 3 - Lexer
+- Assignment 4 - Parser
+- Assignment 5 - Machine Independent Code Translation
+- Assignment 6 - Target Code generation
+
+There are README's present in each of the assignment folders
+
