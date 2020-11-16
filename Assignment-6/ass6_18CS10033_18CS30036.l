@@ -132,12 +132,12 @@ COMMENT                 {MULTILINE_COMMENT}|{SINGLELINE_COMMENT}
 ">>="                   { return RIGHT_SHIFT_EQUAL;   }
 "<<="					{ return LEFT_SHIFT_EQUAL;    }
 
-{COMMENT}           {;}
-
-{IDENTIFIER}             { yylval.idl.name=new string(yytext);return IDENTIFIER;}
-{INTEGER_CONSTANT}         { yylval.intval=atoi(yytext); return INTEGER_CONSTANT;}
-{FLOAT_CONSTANT}		{ yylval.floatval=atof(yytext); return FLOATING_CONSTANT;}
-{CHARACTER_CONSTANT}		{ yylval.charval=yytext[1]; return CHAR_CONST;}
-{STRING_LITERAL}    { yylval.strval = new string(yytext);return STRING_LITERAL;}
-
+{NEWLINE}               { ;                                                                      }
+{WHITESPACE}        	{ ;                 		                                             }
+{COMMENT}				{ ;                  		                                             }
+{INTEGER_CONSTANT}      { yylval._int_value=atoi(yytext); 			   return INTEGER_CONSTANT;  }
+{FLOAT_CONSTANT}		{ yylval._float_value=atof(yytext); 		   return FLOATING_CONSTANT; }
+{CHARACTER_CONSTANT}	{ yylval._char_value=yytext[1]; 			   return CHAR_CONST;		 }
+{STRING_LITERAL}    	{ yylval._string_literal = new string(yytext); return STRING_LITERAL;	 }
+{IDENTIFIER}            { yylval._identifier.name=new string(yytext);  return IDENTIFIER;		 }
 %%

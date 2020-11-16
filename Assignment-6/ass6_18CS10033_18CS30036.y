@@ -23,37 +23,99 @@
 
 
 %union{
-	int intval;   //to hold the value of integer constant
-	char charval; //to hold the value of character constant
-	identifier idl;    // to define the type for Identifier
-	float floatval; //to hold the value of floating constant
-	string *strval; // to hold the value of enumberation scnstant
-	declarator decl;   //to define the declarators
-	arglistStr argsl; //to define the argumnets list
-	int instr;  // to defin the type used by M->(epsilon)
-	expression expon;   // to define the structure of expression
-	list *nextlist;  //to define the nextlist type for N->(epsilon)
+	int _int_value;   //to hold the value of integer constant
+	char _char_value; //to hold the value of character constant
+	float _float_value; //to hold the value of floating constant
+	string* _string_literal; // to hold the value of string literal
+	declarator _declarator;   //to define the declarators
+	identifier _identifier;    // to define the type for Identifier
+	argList _paramList; //to define the argumnets list
+	int _instruction;  // to defin the type used by M->(epsilon)
+	expression _expression;   // to define the structure of expression
+	list *_nextlist;  //to define the _nextlist type for N->(epsilon)
 }
 
-%token AUTO BREAK CASE CHAR CONST CONTINUE DEFAULT DO DOUBLE ELSE ENUM EXTERN
-%token FLOAT FOR GOTO IF INLINE INT LONG REGISTER RESTRICT RETURN SHORT SIGNED SIZEOF STATIC STRUCT SWITCH
-%token TYPEDEF UNION UNSIGNED VOID VOLATILE WHILE BOOL COMPLEX IMAGINARY
-%token ARROW INCREMENT DECREMENT LEFT_SHIFT RIGHT_SHIFT LESS_THAN_EQUAL GREATER_THAN_EQUAL EQUALITY NOT_EQUAL
-%token AND OR ELLIPSIS MULTIPLY_EQUAL DIVIDE_EQUAL MOD_EQUAL PLUS_EQUAL MINUS_EQUAL
-%token LEFT_SHIFT_EQUAL RIGHT_SHIFT_EQUAL AND_EQUAL XOR_EQUAL OR_EQUAL SINGLE_LINE_COMMENT MULTI_LINE_COMMENT
-%token <idl> IDENTIFIER
-%token <intval> INTEGER_CONSTANT
-%token <floatval> FLOATING_CONSTANT
-%token <strval> ENUMERATION_CONSTANT
-%token <charval> CHAR_CONST
-%token <strval> STRING_LITERAL
-%type <expon> primary_expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression AND_expression exclusive_OR_expression inclusive_OR_expression logical_AND_expression logical_OR_expression conditional_expression assignment_expression_opt assignment_expression constant_expression expression expression_statement expression_opt declarator direct_declarator initializer identifier_opt declaration init_declarator_list init_declarator_list_opt init_declarator
-%type <nextlist> block_item_list block_item statement labeled_statement compound_statement selection_statement iteration_statement jump_statement block_item_list_opt
-%type <argsl> argument_expression_list argument_expression_list_opt
-%type <decl> type_specifier declaration_specifiers specifier_qualifier_list type_name pointer pointer_opt
-%type <instr>       M
-%type <nextlist>    N
-%type <charval>     unary_operator
+%token BREAK
+%token CASE
+%token CHAR
+%token CONST
+%token CONTINUE
+%token DEFAULT
+%token DO
+%token DOUBLE
+%token ELSE
+%token EXTERN
+%token FLOAT
+%token FOR
+%token GOTO
+%token IF
+%token INLINE
+%token INT
+%token LONG
+%token RESTRICT
+%token RETURN
+%token SHORT
+%token SIZEOF
+%token STATIC
+%token STRUCT
+%token SWITCH
+%token TYPEDEF
+%token UNION
+%token VOID
+%token VOLATILE
+%token WHILE
+
+%token ARROW
+%token DECREMENT
+%token INCREMENT
+%token RIGHT_SHIFT
+%token LEFT_SHIFT
+%token GREATER_THAN_EQUAL
+%token LESS_THAN_EQUAL
+%token NOT_EQUAL
+%token EQUALITY
+%token OR
+%token AND
+%token ELLIPSIS
+%token PLUS_EQUAL
+%token MINUS_EQUAL
+%token MULTIPLY_EQUAL
+%token MOD_EQUAL
+%token DIVIDE_EQUAL
+%token AND_EQUAL
+%token OR_EQUAL
+%token XOR_EQUAL
+%token RIGHT_SHIFT_EQUAL
+%token LEFT_SHIFT_EQUAL
+
+%token WHITESPACE
+%token COMMENT
+
+%token <_int_value> INTEGER_CONSTANT
+%token <_float_value> FLOATING_CONSTANT
+%token <_char_value> CHAR_CONST
+%token <_string_literal> STRING_LITERAL
+
+%type <_expression>
+	primary_expression postfix_expression unary_expression cast_expression multiplicative_expression
+	additive_expression shift_expression relational_expression equality_expression AND_expression
+	exclusive_OR_expression inclusive_OR_expression logical_AND_expression logical_OR_expression
+	conditional_expression assignment_expression_opt assignment_expression constant_expression expression
+	expression_statement expression_opt declarator direct_declarator initializer declaration init_declarator_list
+	init_declarator_list_opt init_declarator
+
+%type <_nextlist>
+	block_item_list block_item statement labeled_statement compound_statement selection_statement
+	iteration_statement jump_statement block_item_list_opt
+
+%type <_paramList> argument_expression_list argument_expression_list_opt
+%token <_identifier> IDENTIFIER
+%type <_declarator> type_specifier declaration_specifiers specifier_qualifier_list type_name pointer pointer_opt
+
+%type <_instruction> M
+%type <_nextlist>    N
+
+%type <_char_value> unary_operator
 
 %start translation_unit
 
@@ -66,19 +128,19 @@
 %%
 M:
 {
-	$$ = next_instr;
+	$$ = nextInstruction;
 };
 
 N:
 {
-	$$ = makelist(next_instr);
-	glob_quad.emit(Q_GOTO, -1);
+	$$ = makelist(nextInstruction);
+	globalQuadArray.emit(Q_GOTO, -1);
 };
 
 /*Expressions*/
 primary_expression:             IDENTIFIER {
 												//Check whether its a function
-												symdata * check_func = glob_st->search(*$1.name);
+												symbol * check_func = globalSymbolTable->search(*$1.name);
 												int l = 0;
 												int k = 2;
 												for(int i=0;i<10;++i) {
@@ -94,7 +156,7 @@ primary_expression:             IDENTIFIER {
 												}
 												if(check_func == NULL)
 												{
-													$$.loc  =  curr_st->lookup_2(*$1.name);
+													$$.symTPtr  =  currentSymbolTable->globalLookup(*$1.name);
 													int l = 0;
 													int k = 2;
 													for(int i=0;i<10;++i) {
@@ -108,12 +170,12 @@ primary_expression:             IDENTIFIER {
 													else{
 														int o;
 													}
-													if($$.loc->tp_n != NULL && $$.loc->tp_n->basetp == tp_arr)
+													if($$.symTPtr->type != NULL && $$.symTPtr->type->type == tp_arr)
 													{
 														//If array
-														$$.arr = $$.loc;
-														$$.loc = curr_st->gentemp(new symbolType(tp_int));
-														$$.loc->i_val.int_val = 0;
+														$$.arr = $$.symTPtr;
+														$$.symTPtr = currentSymbolTable->gentemp(new symbolType(tp_int));
+														$$.symTPtr->_init_val._INT_INITVAL = 0;
 														int l = 0;
 														int k = 2;
 														for(int i=0;i<10;++i) {
@@ -127,9 +189,9 @@ primary_expression:             IDENTIFIER {
 														else{
 															int o;
 														}
-														$$.loc->isInitialized = true;
-														glob_quad.emit(Q_ASSIGN,0,$$.loc->name);
-														$$.type = $$.arr->tp_n;
+														$$.symTPtr->isInitialized = true;
+														globalQuadArray.emit(Q_ASSIGN,0,$$.symTPtr->name);
+														$$.type = $$.arr->type;
 														for(int l=0;l<10;++l) {
 															int pp = 0;
 														}
@@ -146,7 +208,7 @@ primary_expression:             IDENTIFIER {
 													else
 													{
 														// If not an array
-														$$.type = $$.loc->tp_n;
+														$$.type = $$.symTPtr->type;
 														$$.arr = NULL;
 														int l = 0;
 														int k = 2;
@@ -178,8 +240,8 @@ primary_expression:             IDENTIFIER {
 												else
 												{
 													// It is a function
-													$$.loc = check_func;
-													$$.type = check_func->tp_n;
+													$$.symTPtr = check_func;
+													$$.type = check_func->type;
 													int l = 0;
 													int k = 2;
 													for(int i=0;i<10;++i) {
@@ -210,8 +272,8 @@ primary_expression:             IDENTIFIER {
 											} |
 								INTEGER_CONSTANT {
 													// Declare and initialize the value of the temporary variable with the integer
-													$$.loc  = curr_st->gentemp(new symbolType(tp_int));
-													$$.type = $$.loc->tp_n;
+													$$.symTPtr  = currentSymbolTable->gentemp(new symbolType(tp_int));
+													$$.type = $$.symTPtr->type;
 													for(int l=0;l<10;++l) {
 														int pp = 0;
 													}
@@ -223,7 +285,7 @@ primary_expression:             IDENTIFIER {
 													else{
 														int n;
 													}
-													$$.loc->i_val.int_val = $1;
+													$$.symTPtr->_init_val._INT_INITVAL = $1;
 													int l = 0;
 													int k = 2;
 													for(int i=0;i<10;++i) {
@@ -237,7 +299,7 @@ primary_expression:             IDENTIFIER {
 													else{
 														int o;
 													}
-													$$.loc->isInitialized = true;
+													$$.symTPtr->isInitialized = true;
 													$$.arr = NULL;
 													for(int l=0;l<10;++l) {
 														int pp = 0;
@@ -250,12 +312,12 @@ primary_expression:             IDENTIFIER {
 													else{
 														int n;
 													}
-													glob_quad.emit(Q_ASSIGN, $1, $$.loc->name);
+													globalQuadArray.emit(Q_ASSIGN, $1, $$.symTPtr->name);
 												} |
 								FLOATING_CONSTANT {
-													// Declare and initialize the value of the temporary variable with the floatval
-													$$.loc  = curr_st->gentemp(new symbolType(tp_double));
-													$$.type = $$.loc->tp_n;
+													// Declare and initialize the value of the temporary variable with the _float_value
+													$$.symTPtr  = currentSymbolTable->gentemp(new symbolType(tp_double));
+													$$.type = $$.symTPtr->type;
 													for(int l=0;l<10;++l) {
 														int pp = 0;
 													}
@@ -267,7 +329,7 @@ primary_expression:             IDENTIFIER {
 													else{
 														int n;
 													}
-													$$.loc->i_val.double_val = $1;
+													$$.symTPtr->_init_val._DOUBLE_INITVAL = $1;
 													int l = 0;
 													int k = 2;
 													for(int i=0;i<10;++i) {
@@ -281,7 +343,7 @@ primary_expression:             IDENTIFIER {
 													else{
 														int o;
 													}
-													$$.loc->isInitialized = true;
+													$$.symTPtr->isInitialized = true;
 													$$.arr = NULL;
 													for(int l=0;l<10;++l) {
 														int pp = 0;
@@ -294,12 +356,12 @@ primary_expression:             IDENTIFIER {
 													else{
 														int n;
 													}
-													glob_quad.emit(Q_ASSIGN, $1, $$.loc->name);
+													globalQuadArray.emit(Q_ASSIGN, $1, $$.symTPtr->name);
 												  } |
 								CHAR_CONST {
 												// Declare and initialize the value of the temporary variable with the character
-												$$.loc  = curr_st->gentemp(new symbolType(tp_char));
-												$$.type = $$.loc->tp_n;
+												$$.symTPtr  = currentSymbolTable->gentemp(new symbolType(tp_char));
+												$$.type = $$.symTPtr->type;
 												for(int l=0;l<10;++l) {
 													int pp = 0;
 												}
@@ -311,8 +373,8 @@ primary_expression:             IDENTIFIER {
 												else{
 													int n;
 												}
-												$$.loc->i_val.char_val = $1;
-												$$.loc->isInitialized = true;
+												$$.symTPtr->_init_val._CHAR_INITVAL = $1;
+												$$.symTPtr->isInitialized = true;
 												int l = 0;
 												int k = 2;
 												for(int i=0;i<10;++i) {
@@ -327,12 +389,12 @@ primary_expression:             IDENTIFIER {
 													int o;
 												}
 												$$.arr = NULL;
-												glob_quad.emit(Q_ASSIGN, $1, $$.loc->name);
+												globalQuadArray.emit(Q_ASSIGN, $1, $$.symTPtr->name);
 											} |
 								STRING_LITERAL {
 
-													strings_label.push_back(*$1);
-													$$.loc = NULL;
+													_string_labels.push_back(*$1);
+													$$.symTPtr = NULL;
 													for(int l=0;l<10;++l) {
 														int pp = 0;
 													}
@@ -358,7 +420,7 @@ primary_expression:             IDENTIFIER {
 													else{
 														int o;
 													}
-													$$.ind_str = strings_label.size()-1;
+													$$.ind_str = _string_labels.size()-1;
 													$$.arr = NULL;
 													$$.isPointer = false;
 												} |
@@ -366,15 +428,13 @@ primary_expression:             IDENTIFIER {
 														$$ = $2;
 												   };
 
-enumeration_constant:           IDENTIFIER {};
-
 postfix_expression :            primary_expression {
 														 $$ = $1;
 													} |
 								postfix_expression '[' expression ']' {
 																		//Explanation of Array handling
 
-																		$$.loc = curr_st->gentemp(new symbolType(tp_int));
+																		$$.symTPtr = currentSymbolTable->gentemp(new symbolType(tp_int));
 																		for(int l=0;l<10;++l) {
 																			int pp = 0;
 																		}
@@ -387,11 +447,11 @@ postfix_expression :            primary_expression {
 																			int n;
 																		}
 
-																		symdata* temporary = curr_st->gentemp(new symbolType(tp_int));
+																		symbol* temporary = currentSymbolTable->gentemp(new symbolType(tp_int));
 
 																		char temp[10];
-																		//printf("hoooooooooooooooooooooooooooooooooo %s\n",$1.loc->name.c_str());
-																		sprintf(temp,"%d",$1.type->next->getSize());
+																		//printf("hoooooooooooooooooooooooooooooooooo %s\n",$1.symTPtr->name.c_str());
+																		sprintf(temp,"%d",$1.type->next->sizeOfType());
 																		int l = 0;
 																		int k = 2;
 																		for(int i=0;i<10;++i) {
@@ -405,23 +465,23 @@ postfix_expression :            primary_expression {
 																		else{
 																			int o;
 																		}
-																		glob_quad.emit(Q_MULT,$3.loc->name,temp,temporary->name);
-																		glob_quad.emit(Q_PLUS,$1.loc->name,temporary->name,$$.loc->name);
+																		globalQuadArray.emit(Q_MULT,$3.symTPtr->name,temp,temporary->name);
+																		globalQuadArray.emit(Q_PLUS,$1.symTPtr->name,temporary->name,$$.symTPtr->name);
 
-																		// the new size will be calculated and the temporary variable storing the size will be passed on a $$.loc
+																		// the new size will be calculated and the temporary variable storing the size will be passed on a $$.symTPtr
 
 																		//$$.arr <= base pointer
 																		$$.arr = $1.arr;
 
-																		//$$.type <= basetp(arr)
+																		//$$.type <= type(arr)
 																		$$.type = $1.type->next;
 																		$$.poss_array = NULL;
 
-																		//$$.arr->tp_n has the full type of the arr which will be used for size calculations
+																		//$$.arr->type has the full type of the arr which will be used for size calculations
 																	 } |
 								postfix_expression '(' argument_expression_list_opt ')' {
 																							//Explanation of Function Handling
-																							if(!$1.isPointer && !$1.isString && ($1.type) && ($1.type->basetp==tp_void))
+																							if(!$1.isPointer && !$1.isString && ($1.type) && ($1.type->type==tp_void))
 																							{
 																								int l = 0;
 																								int k = 2;
@@ -438,10 +498,10 @@ postfix_expression :            primary_expression {
 																								}
 																							}
 																							else
-																								$$.loc = curr_st->gentemp(CopyType($1.type));
+																								$$.symTPtr = currentSymbolTable->gentemp(CopyType($1.type));
 																							//temporary is created
 																							char str[10];
-																							if($3.arguments == NULL)
+																							if($3.args == NULL)
 																							{
 																								for(int l=0;l<10;++l) {
 																									int pp = 0;
@@ -469,14 +529,14 @@ postfix_expression :            primary_expression {
 																								else{
 																									int o;
 																								}
-																								if($1.type->basetp!=tp_void)
-																									glob_quad.emit(Q_CALL,$1.loc->name,str,$$.loc->name);
+																								if($1.type->type!=tp_void)
+																									globalQuadArray.emit(Q_CALL,$1.symTPtr->name,str,$$.symTPtr->name);
 																								else
-																									glob_quad.emit2(Q_CALL,$1.loc->name,str);
+																									globalQuadArray.emitG(Q_CALL,$1.symTPtr->name,str);
 																							}
 																							else
 																							{
-																								if((*$3.arguments)[0]->isString)
+																								if((*$3.args)[0]->isString)
 																								{
 																									str[0] = '_';
 																									for(int l=0;l<10;++l) {
@@ -490,8 +550,8 @@ postfix_expression :            primary_expression {
 																									else{
 																										int n;
 																									}
-																									sprintf(str+1,"%d",(*$3.arguments)[0]->ind_str);
-																									glob_quad.emit(Q_PARAM,str);
+																									sprintf(str+1,"%d",(*$3.args)[0]->ind_str);
+																									globalQuadArray.emit(Q_PARAM,str);
 																									int l = 0;
 																									int k = 2;
 																									for(int i=0;i<10;++i) {
@@ -505,11 +565,11 @@ postfix_expression :            primary_expression {
 																									else{
 																										int o;
 																									}
-																									glob_quad.emit(Q_CALL,$1.loc->name,"1",$$.loc->name);
+																									globalQuadArray.emit(Q_CALL,$1.symTPtr->name,"1",$$.symTPtr->name);
 																								}
 																								else
 																								{
-																									for(int i=0;i<$3.arguments->size();i++)
+																									for(int i=0;i<$3.args->size();i++)
 																									{
 																										// To print the parameters
 																										int l = 0;
@@ -525,16 +585,16 @@ postfix_expression :            primary_expression {
 																										else{
 																											int o;
 																										}
-																										if((*$3.arguments)[i]->poss_array != NULL && $1.loc->name != "printi")
-																											glob_quad.emit(Q_PARAM,(*$3.arguments)[i]->poss_array->name);
+																										if((*$3.args)[i]->poss_array != NULL && $1.symTPtr->name != "printInt")
+																											globalQuadArray.emit(Q_PARAM,(*$3.args)[i]->poss_array->name);
 																										else
-																											glob_quad.emit(Q_PARAM,(*$3.arguments)[i]->loc->name);
+																											globalQuadArray.emit(Q_PARAM,(*$3.args)[i]->symTPtr->name);
 
 																									}
-																									sprintf(str,"%ld",$3.arguments->size());
-																									//printf("function %s-->%d\n",$1.loc->name.c_str(),$1.type->basetp);
-																									if($1.type->basetp!=tp_void) {
-																										glob_quad.emit(Q_CALL,$1.loc->name,str,$$.loc->name);
+																									sprintf(str,"%ld",$3.args->size());
+																									//printf("function %s-->%d\n",$1.symTPtr->name.c_str(),$1.type->type);
+																									if($1.type->type!=tp_void) {
+																										globalQuadArray.emit(Q_CALL,$1.symTPtr->name,str,$$.symTPtr->name);
 																										for(int l=0;l<10;++l) {
 																											int pp = 0;
 																										}
@@ -548,24 +608,24 @@ postfix_expression :            primary_expression {
 																										}
 																									}
 																									else
-																										glob_quad.emit2(Q_CALL,$1.loc->name,str);
+																										globalQuadArray.emitG(Q_CALL,$1.symTPtr->name,str);
 																								}
 																							}
 
 																							$$.arr = NULL;
-																							$$.type = $$.loc->tp_n;
+																							$$.type = $$.symTPtr->type;
 																						 } |
 								postfix_expression '.' IDENTIFIER {/*Struct Logic to be Skipped*/}|
 								postfix_expression ARROW IDENTIFIER {
 																			/*----*/
 																	  } |
 								postfix_expression INCREMENT {
-																$$.loc = curr_st->gentemp(CopyType($1.type));
+																$$.symTPtr = currentSymbolTable->gentemp(CopyType($1.type));
 																if($1.arr != NULL)
 																{
 																	// Post increment of an array element
-																	symdata * temp_elem = curr_st->gentemp(CopyType($1.type));
-																	glob_quad.emit(Q_RINDEX,$1.arr->name,$1.loc->name,$$.loc->name);
+																	symbol * temp_elem = currentSymbolTable->gentemp(CopyType($1.type));
+																	globalQuadArray.emit(Q_RINDEX,$1.arr->name,$1.symTPtr->name,$$.symTPtr->name);
 																	for(int l=0;l<10;++l) {
 																		int pp = 0;
 																	}
@@ -577,7 +637,7 @@ postfix_expression :            primary_expression {
 																	else{
 																		int n;
 																	}
-																	glob_quad.emit(Q_RINDEX,$1.arr->name,$1.loc->name,temp_elem->name);
+																	globalQuadArray.emit(Q_RINDEX,$1.arr->name,$1.symTPtr->name,temp_elem->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -591,8 +651,8 @@ postfix_expression :            primary_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_PLUS,temp_elem->name,"1",temp_elem->name);
-																	glob_quad.emit(Q_LINDEX,$1.loc->name,temp_elem->name,$1.arr->name);
+																	globalQuadArray.emit(Q_PLUS,temp_elem->name,"1",temp_elem->name);
+																	globalQuadArray.emit(Q_LINDEX,$1.symTPtr->name,temp_elem->name,$1.arr->name);
 																	$$.arr = NULL;
 																}
 																else
@@ -609,7 +669,7 @@ postfix_expression :            primary_expression {
 																	else{
 																		int n;
 																	}
-																	glob_quad.emit(Q_ASSIGN,$1.loc->name,$$.loc->name);
+																	globalQuadArray.emit(Q_ASSIGN,$1.symTPtr->name,$$.symTPtr->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -623,12 +683,12 @@ postfix_expression :            primary_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_PLUS,$1.loc->name,"1",$1.loc->name);
+																	globalQuadArray.emit(Q_PLUS,$1.symTPtr->name,"1",$1.symTPtr->name);
 																}
-																$$.type = $$.loc->tp_n;
+																$$.type = $$.symTPtr->type;
 															 } |
 								postfix_expression DECREMENT {
-																$$.loc = curr_st->gentemp(CopyType($1.type));
+																$$.symTPtr = currentSymbolTable->gentemp(CopyType($1.type));
 																if($1.arr != NULL)
 																{
 																	// Post decrement of an array element
@@ -643,8 +703,8 @@ postfix_expression :            primary_expression {
 																	else{
 																		int n;
 																	}
-																	symdata * temp_elem = curr_st->gentemp(CopyType($1.type));
-																	glob_quad.emit(Q_RINDEX,$1.arr->name,$1.loc->name,$$.loc->name);
+																	symbol * temp_elem = currentSymbolTable->gentemp(CopyType($1.type));
+																	globalQuadArray.emit(Q_RINDEX,$1.arr->name,$1.symTPtr->name,$$.symTPtr->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -658,8 +718,8 @@ postfix_expression :            primary_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_RINDEX,$1.arr->name,$1.loc->name,temp_elem->name);
-																	glob_quad.emit(Q_MINUS,temp_elem->name,"1",temp_elem->name);
+																	globalQuadArray.emit(Q_RINDEX,$1.arr->name,$1.symTPtr->name,temp_elem->name);
+																	globalQuadArray.emit(Q_MINUS,temp_elem->name,"1",temp_elem->name);
 																	for(int l=0;l<10;++l) {
 																		int pp = 0;
 																	}
@@ -671,13 +731,13 @@ postfix_expression :            primary_expression {
 																	else{
 																		int n;
 																	}
-																	glob_quad.emit(Q_LINDEX,$1.loc->name,temp_elem->name,$1.arr->name);
+																	globalQuadArray.emit(Q_LINDEX,$1.symTPtr->name,temp_elem->name,$1.arr->name);
 																	$$.arr = NULL;
 																}
 																else
 																{
 																	//post decrement of an simple element
-																	glob_quad.emit(Q_ASSIGN,$1.loc->name,$$.loc->name);
+																	globalQuadArray.emit(Q_ASSIGN,$1.symTPtr->name,$$.symTPtr->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -691,9 +751,9 @@ postfix_expression :            primary_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_MINUS,$1.loc->name,"1",$1.loc->name);
+																	globalQuadArray.emit(Q_MINUS,$1.symTPtr->name,"1",$1.symTPtr->name);
 																}
-																$$.type = $$.loc->tp_n;
+																$$.type = $$.symTPtr->type;
 															  } |
 								'(' type_name ')' '{' initializer_list '}' {
 																				/*------*/
@@ -703,7 +763,7 @@ postfix_expression :            primary_expression {
 																			   };
 
 argument_expression_list:       assignment_expression {
-														$$.arguments = new vector<expression*>;
+														$$.args = new vector<expression*>;
 														for(int l=0;l<10;++l) {
 															int pp = 0;
 														}
@@ -729,19 +789,19 @@ argument_expression_list:       assignment_expression {
 														else{
 															int o;
 														}
-														$$.arguments->push_back(tex);
-														//printf("name2-->%s\n",tex->loc->name.c_str());
+														$$.args->push_back(tex);
+														//printf("name2-->%s\n",tex->symTPtr->name.c_str());
 													 }|
 								argument_expression_list ',' assignment_expression {
 																						expression * tex = new expression($3);
-																						$$.arguments->push_back(tex);
+																						$$.args->push_back(tex);
 																					};
 
 argument_expression_list_opt:   argument_expression_list {
 															$$ = $1;
 														  }|
 								/*epsilon*/ {
-												$$.arguments = NULL;
+												$$.args = NULL;
 												int l = 0;
 												int k = 2;
 												for(int i=0;i<10;++i) {
@@ -761,12 +821,12 @@ unary_expression:               postfix_expression {
 														$$ = $1;
 												   }|
 								INCREMENT unary_expression {
-																$$.loc = curr_st->gentemp($2.type);
+																$$.symTPtr = currentSymbolTable->gentemp($2.type);
 																if($2.arr != NULL)
 																{
 																	// pre increment of an Array element
-																	symdata * temp_elem = curr_st->gentemp(CopyType($2.type));
-																	glob_quad.emit(Q_RINDEX,$2.arr->name,$2.loc->name,temp_elem->name);
+																	symbol * temp_elem = currentSymbolTable->gentemp(CopyType($2.type));
+																	globalQuadArray.emit(Q_RINDEX,$2.arr->name,$2.symTPtr->name,temp_elem->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -780,15 +840,15 @@ unary_expression:               postfix_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_PLUS,temp_elem->name,"1",temp_elem->name);
-																	glob_quad.emit(Q_LINDEX,$2.loc->name,temp_elem->name,$2.arr->name);
-																	glob_quad.emit(Q_RINDEX,$2.arr->name,$2.loc->name,$$.loc->name);
+																	globalQuadArray.emit(Q_PLUS,temp_elem->name,"1",temp_elem->name);
+																	globalQuadArray.emit(Q_LINDEX,$2.symTPtr->name,temp_elem->name,$2.arr->name);
+																	globalQuadArray.emit(Q_RINDEX,$2.arr->name,$2.symTPtr->name,$$.symTPtr->name);
 																	$$.arr = NULL;
 																}
 																else
 																{
 																	// pre increment
-																	glob_quad.emit(Q_PLUS,$2.loc->name,"1",$2.loc->name);
+																	globalQuadArray.emit(Q_PLUS,$2.symTPtr->name,"1",$2.symTPtr->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -802,7 +862,7 @@ unary_expression:               postfix_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_ASSIGN,$2.loc->name,$$.loc->name);
+																	globalQuadArray.emit(Q_ASSIGN,$2.symTPtr->name,$$.symTPtr->name);
 																	for(int l=0;l<10;++l) {
 																		int pp = 0;
 																	}
@@ -815,10 +875,10 @@ unary_expression:               postfix_expression {
 																		int n;
 																	}
 																}
-																$$.type = $$.loc->tp_n;
+																$$.type = $$.symTPtr->type;
 															}|
 								DECREMENT unary_expression {
-																$$.loc = curr_st->gentemp(CopyType($2.type));
+																$$.symTPtr = currentSymbolTable->gentemp(CopyType($2.type));
 																if($2.arr != NULL)
 																{
 																	//pre decrement of  Array Element
@@ -833,9 +893,9 @@ unary_expression:               postfix_expression {
 																	else{
 																		int n;
 																	}
-																	symdata * temp_elem = curr_st->gentemp(CopyType($2.type));
-																	glob_quad.emit(Q_RINDEX,$2.arr->name,$2.loc->name,temp_elem->name);
-																	glob_quad.emit(Q_MINUS,temp_elem->name,"1",temp_elem->name);
+																	symbol * temp_elem = currentSymbolTable->gentemp(CopyType($2.type));
+																	globalQuadArray.emit(Q_RINDEX,$2.arr->name,$2.symTPtr->name,temp_elem->name);
+																	globalQuadArray.emit(Q_MINUS,temp_elem->name,"1",temp_elem->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -849,8 +909,8 @@ unary_expression:               postfix_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_LINDEX,$2.loc->name,temp_elem->name,$2.arr->name);
-																	glob_quad.emit(Q_RINDEX,$2.arr->name,$2.loc->name,$$.loc->name);
+																	globalQuadArray.emit(Q_LINDEX,$2.symTPtr->name,temp_elem->name,$2.arr->name);
+																	globalQuadArray.emit(Q_RINDEX,$2.arr->name,$2.symTPtr->name,$$.symTPtr->name);
 																	for(int l=0;l<10;++l) {
 																		int pp = 0;
 																	}
@@ -867,7 +927,7 @@ unary_expression:               postfix_expression {
 																else
 																{
 																	// pre decrement
-																	glob_quad.emit(Q_MINUS,$2.loc->name,"1",$2.loc->name);
+																	globalQuadArray.emit(Q_MINUS,$2.symTPtr->name,"1",$2.symTPtr->name);
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -881,9 +941,9 @@ unary_expression:               postfix_expression {
 																	else{
 																		int o;
 																	}
-																	glob_quad.emit(Q_ASSIGN,$2.loc->name,$$.loc->name);
+																	globalQuadArray.emit(Q_ASSIGN,$2.symTPtr->name,$$.symTPtr->name);
 																}
-																$$.type = $$.loc->tp_n;
+																$$.type = $$.symTPtr->type;
 																for(int l=0;l<10;++l) {
 																	int pp = 0;
 																}
@@ -915,8 +975,8 @@ unary_expression:               postfix_expression {
 																			else{
 																				int n;
 																			}
-																			$$.loc = curr_st->gentemp(CopyType(temp_type));
-																			$$.type = $$.loc->tp_n;
+																			$$.symTPtr = currentSymbolTable->gentemp(CopyType(temp_type));
+																			$$.type = $$.symTPtr->type;
 																			// int l = 0;
 																			// int k = 2;
 																			for(int i=0;i<10;++i) {
@@ -930,13 +990,13 @@ unary_expression:               postfix_expression {
 																			else{
 																				int o;
 																			}
-																			glob_quad.emit(Q_ADDR,$2.loc->name,$$.loc->name);
+																			globalQuadArray.emit(Q_ADDR,$2.symTPtr->name,$$.symTPtr->name);
 																			$$.arr = NULL;
 																			break;
 																		case '*':
 																			$$.isPointer = true;
-																			$$.type = $2.loc->tp_n->next;
-																			$$.loc = $2.loc;
+																			$$.type = $2.symTPtr->type->next;
+																			$$.symTPtr = $2.symTPtr;
 																			for(int i=0;i<10;++i) {
 																				int ll = 0;
 																			}
@@ -951,8 +1011,8 @@ unary_expression:               postfix_expression {
 																			$$.arr = NULL;
 																			break;
 																		case '+':
-																			$$.loc = curr_st->gentemp(CopyType($2.type));
-																			$$.type = $$.loc->tp_n;
+																			$$.symTPtr = currentSymbolTable->gentemp(CopyType($2.type));
+																			$$.type = $$.symTPtr->type;
 																			for(int i=0;i<10;++i) {
 																				int lll = 0;
 																			}
@@ -964,11 +1024,11 @@ unary_expression:               postfix_expression {
 																			else{
 																				int o;
 																			}
-																			glob_quad.emit(Q_ASSIGN,$2.loc->name,$$.loc->name);
+																			globalQuadArray.emit(Q_ASSIGN,$2.symTPtr->name,$$.symTPtr->name);
 																			break;
 																		case '-':
-																			$$.loc = curr_st->gentemp(CopyType($2.type));
-																			$$.type = $$.loc->tp_n;
+																			$$.symTPtr = currentSymbolTable->gentemp(CopyType($2.type));
+																			$$.type = $$.symTPtr->type;
 																			for(int i=0;i<10;++i) {
 																				int l = 0;
 																			}
@@ -980,12 +1040,12 @@ unary_expression:               postfix_expression {
 																			else{
 																				int o;
 																			}
-																			glob_quad.emit(Q_UNARY_MINUS,$2.loc->name,$$.loc->name);
+																			globalQuadArray.emit(Q_UNARY_MINUS,$2.symTPtr->name,$$.symTPtr->name);
 																			break;
 																		case '~':
 																			/*Bitwise Not to be implemented Later on*/
-																			$$.loc = curr_st->gentemp(CopyType($2.type));
-																			$$.type = $$.loc->tp_n;
+																			$$.symTPtr = currentSymbolTable->gentemp(CopyType($2.type));
+																			$$.type = $$.symTPtr->type;
 																			for(int i=0;i<10;++i) {
 																				int l = 0;
 																			}
@@ -997,11 +1057,11 @@ unary_expression:               postfix_expression {
 																			else{
 																				int o;
 																			}
-																			glob_quad.emit(Q_NOT,$2.loc->name,$$.loc->name);
+																			globalQuadArray.emit(Q_NOT,$2.symTPtr->name,$$.symTPtr->name);
 																			break;
 																		case '!':
-																			$$.loc = curr_st->gentemp(CopyType($2.type));
-																			$$.type = $$.loc->tp_n;
+																			$$.symTPtr = currentSymbolTable->gentemp(CopyType($2.type));
+																			$$.type = $$.symTPtr->type;
 																			for(int i=0;i<10;++i) {
 																				int l = 0;
 																			}
@@ -1043,10 +1103,10 @@ unary_operator  :               '&' {
 									};
 
 cast_expression :               unary_expression {
-													if($1.arr != NULL && $1.arr->tp_n != NULL&& $1.poss_array==NULL)
+													if($1.arr != NULL && $1.arr->type != NULL&& $1.poss_array==NULL)
 													{
 														//Right Indexing of an array element as unary expression is converted into cast expression
-														$$.loc = curr_st->gentemp(new symbolType($1.type->basetp));
+														$$.symTPtr = currentSymbolTable->gentemp(new symbolType($1.type->type));
 														for(int l=0;l<10;++l) {
 															int pp = 0;
 														}
@@ -1058,7 +1118,7 @@ cast_expression :               unary_expression {
 														else{
 															int n;
 														}
-														glob_quad.emit(Q_RINDEX,$1.arr->name,$1.loc->name,$$.loc->name);
+														globalQuadArray.emit(Q_RINDEX,$1.arr->name,$1.symTPtr->name,$$.symTPtr->name);
 														$$.arr = NULL;
 														int l = 0;
 														int k = 2;
@@ -1073,14 +1133,14 @@ cast_expression :               unary_expression {
 														else{
 															int o;
 														}
-														$$.type = $$.loc->tp_n;
+														$$.type = $$.symTPtr->type;
 														//$$.poss_array=$1.arr;
-														//printf("name --> %s\n",$$.loc->name.c_str());
+														//printf("name --> %s\n",$$.symTPtr->name.c_str());
 													}
 													else if($1.isPointer == true)
 													{
 														//RDereferencing as its a pointer
-														$$.loc = curr_st->gentemp(CopyType($1.type));
+														$$.symTPtr = currentSymbolTable->gentemp(CopyType($1.type));
 														for(int l=0;l<10;++l) {
 															int pp = 0;
 														}
@@ -1106,7 +1166,7 @@ cast_expression :               unary_expression {
 														else{
 															int o;
 														}
-														glob_quad.emit(Q_RDEREF,$1.loc->name,$$.loc->name);
+														globalQuadArray.emit(Q_RDEREF,$1.symTPtr->name,$$.symTPtr->name);
 													}
 													else
 														$$ = $1;
@@ -1120,8 +1180,8 @@ multiplicative_expression:      cast_expression {
 												}|
 								multiplicative_expression '*' cast_expression {
 																					typecheck(&$1,&$3);
-																					$$.loc = curr_st->gentemp($1.type);
-																					$$.type = $$.loc->tp_n;
+																					$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																					$$.type = $$.symTPtr->type;
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -1146,12 +1206,12 @@ multiplicative_expression:      cast_expression {
 																					else{
 																						int n;
 																					}
-																					glob_quad.emit(Q_MULT,$1.loc->name,$3.loc->name,$$.loc->name);
+																					globalQuadArray.emit(Q_MULT,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																			  }|
 								multiplicative_expression '/' cast_expression {
 																					typecheck(&$1,&$3);
-																					$$.loc = curr_st->gentemp($1.type);
-																					$$.type = $$.loc->tp_n;
+																					$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																					$$.type = $$.symTPtr->type;
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -1165,7 +1225,7 @@ multiplicative_expression:      cast_expression {
 																					else{
 																						int o;
 																					}
-																					glob_quad.emit(Q_DIVIDE,$1.loc->name,$3.loc->name,$$.loc->name);
+																					globalQuadArray.emit(Q_DIVIDE,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																			  }|
 								multiplicative_expression '%' cast_expression{
 																					typecheck(&$1,&$3);
@@ -1180,8 +1240,8 @@ multiplicative_expression:      cast_expression {
 																					else{
 																						int n;
 																					}
-																					$$.loc = curr_st->gentemp($1.type);
-																					$$.type = $$.loc->tp_n;
+																					$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																					$$.type = $$.symTPtr->type;
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -1195,7 +1255,7 @@ multiplicative_expression:      cast_expression {
 																					else{
 																						int o;
 																					}
-																					glob_quad.emit(Q_MODULO,$1.loc->name,$3.loc->name,$$.loc->name);
+																					globalQuadArray.emit(Q_MODULO,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																			 };
 
 additive_expression :           multiplicative_expression {
@@ -1214,8 +1274,8 @@ additive_expression :           multiplicative_expression {
 																						else{
 																							int n;
 																						}
-																						$$.loc = curr_st->gentemp($1.type);
-																						$$.type = $$.loc->tp_n;
+																						$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																						$$.type = $$.symTPtr->type;
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -1229,7 +1289,7 @@ additive_expression :           multiplicative_expression {
 																						else{
 																							int o;
 																						}
-																						glob_quad.emit(Q_PLUS,$1.loc->name,$3.loc->name,$$.loc->name);
+																						globalQuadArray.emit(Q_PLUS,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																				  }|
 								additive_expression '-' multiplicative_expression {
 																						typecheck(&$1,&$3);
@@ -1244,8 +1304,8 @@ additive_expression :           multiplicative_expression {
 																						else{
 																							int n;
 																						}
-																						$$.loc = curr_st->gentemp($1.type);
-																						$$.type = $$.loc->tp_n;
+																						$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																						$$.type = $$.symTPtr->type;
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -1259,15 +1319,15 @@ additive_expression :           multiplicative_expression {
 																						else{
 																							int o;
 																						}
-																						glob_quad.emit(Q_MINUS,$1.loc->name,$3.loc->name,$$.loc->name);
+																						globalQuadArray.emit(Q_MINUS,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																				  };
 
 shift_expression:               additive_expression {
 														$$ = $1;
 													}|
 								shift_expression LEFT_SHIFT additive_expression {
-																					$$.loc = curr_st->gentemp($1.type);
-																					$$.type = $$.loc->tp_n;
+																					$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																					$$.type = $$.symTPtr->type;
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -1281,10 +1341,10 @@ shift_expression:               additive_expression {
 																					else{
 																						int o;
 																					}
-																					glob_quad.emit(Q_LEFT_OP,$1.loc->name,$3.loc->name,$$.loc->name);
+																					globalQuadArray.emit(Q_LEFT_OP,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																				}|
 								shift_expression RIGHT_SHIFT additive_expression{
-																					$$.loc = curr_st->gentemp($1.type);
+																					$$.symTPtr = currentSymbolTable->gentemp($1.type);
 																					for(int l=0;l<10;++l) {
 																						int pp = 0;
 																					}
@@ -1296,7 +1356,7 @@ shift_expression:               additive_expression {
 																					else{
 																						int n;
 																					}
-																					$$.type = $$.loc->tp_n;
+																					$$.type = $$.symTPtr->type;
 																					for(int l=0;l<10;++l) {
 																						int pp = 0;
 																					}
@@ -1308,7 +1368,7 @@ shift_expression:               additive_expression {
 																					else{
 																						int n;
 																					}
-																					glob_quad.emit(Q_RIGHT_OP,$1.loc->name,$3.loc->name,$$.loc->name);
+																					globalQuadArray.emit(Q_RIGHT_OP,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																				};
 
 relational_expression:          shift_expression {
@@ -1328,7 +1388,7 @@ relational_expression:          shift_expression {
 																					int n;
 																				}
 																				$$.type = new symbolType(tp_bool);
-																				$$.truelist = makelist(next_instr);
+																				$$.truelist = makelist(nextInstruction);
 																				int l = 0;
 																				int k = 2;
 																				for(int i=0;i<10;++i) {
@@ -1342,7 +1402,7 @@ relational_expression:          shift_expression {
 																				else{
 																					int o;
 																				}
-																				$$.falselist = makelist(next_instr+1);
+																				$$.falselist = makelist(nextInstruction+1);
 																				for(int l=0;l<10;++l) {
 																					int pp = 0;
 																				}
@@ -1354,13 +1414,13 @@ relational_expression:          shift_expression {
 																				else{
 																					int n;
 																				}
-																				glob_quad.emit(Q_IF_LESS,$1.loc->name,$3.loc->name,"-1");
-																				glob_quad.emit(Q_GOTO,"-1");
+																				globalQuadArray.emit(Q_IF_LESS,$1.symTPtr->name,$3.symTPtr->name,"-1");
+																				globalQuadArray.emit(Q_GOTO,"-1");
 																		   }|
 								relational_expression '>' shift_expression {
 																				typecheck(&$1,&$3);
 																				$$.type = new symbolType(tp_bool);
-																				$$.truelist = makelist(next_instr);
+																				$$.truelist = makelist(nextInstruction);
 																				int l = 0;
 																				int k = 2;
 																				for(int i=0;i<10;++i) {
@@ -1374,9 +1434,9 @@ relational_expression:          shift_expression {
 																				else{
 																					int o;
 																				}
-																				$$.falselist = makelist(next_instr+1);
-																				glob_quad.emit(Q_IF_GREATER,$1.loc->name,$3.loc->name,"-1");
-																				glob_quad.emit(Q_GOTO,"-1");
+																				$$.falselist = makelist(nextInstruction+1);
+																				globalQuadArray.emit(Q_IF_GREATER,$1.symTPtr->name,$3.symTPtr->name,"-1");
+																				globalQuadArray.emit(Q_GOTO,"-1");
 																		   }|
 								relational_expression LESS_THAN_EQUAL shift_expression {
 																						typecheck(&$1,&$3);
@@ -1392,7 +1452,7 @@ relational_expression:          shift_expression {
 																						else{
 																							int n;
 																						}
-																						$$.truelist = makelist(next_instr);
+																						$$.truelist = makelist(nextInstruction);
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -1406,9 +1466,9 @@ relational_expression:          shift_expression {
 																						else{
 																							int o;
 																						}
-																						$$.falselist = makelist(next_instr+1);
-																						glob_quad.emit(Q_IF_LESS_OR_EQUAL,$1.loc->name,$3.loc->name,"-1");
-																						glob_quad.emit(Q_GOTO,"-1");
+																						$$.falselist = makelist(nextInstruction+1);
+																						globalQuadArray.emit(Q_IF_LESS_OR_EQUAL,$1.symTPtr->name,$3.symTPtr->name,"-1");
+																						globalQuadArray.emit(Q_GOTO,"-1");
 																					}|
 								relational_expression GREATER_THAN_EQUAL shift_expression {
 																							typecheck(&$1,&$3);
@@ -1424,7 +1484,7 @@ relational_expression:          shift_expression {
 																								int n;
 																							}
 																							$$.type = new symbolType(tp_bool);
-																							$$.truelist = makelist(next_instr);
+																							$$.truelist = makelist(nextInstruction);
 																							int l = 0;
 																							int k = 2;
 																							for(int i=0;i<10;++i) {
@@ -1438,9 +1498,9 @@ relational_expression:          shift_expression {
 																							else{
 																								int o;
 																							}
-																							$$.falselist = makelist(next_instr+1);
-																							glob_quad.emit(Q_IF_GREATER_OR_EQUAL,$1.loc->name,$3.loc->name,"-1");
-																							glob_quad.emit(Q_GOTO,"-1");
+																							$$.falselist = makelist(nextInstruction+1);
+																							globalQuadArray.emit(Q_IF_GREATER_OR_EQUAL,$1.symTPtr->name,$3.symTPtr->name,"-1");
+																							globalQuadArray.emit(Q_GOTO,"-1");
 																					  };
 
 equality_expression:            relational_expression {
@@ -1449,7 +1509,7 @@ equality_expression:            relational_expression {
 								equality_expression EQUALITY relational_expression {
 																						typecheck(&$1,&$3);
 																						$$.type = new symbolType(tp_bool);
-																						$$.truelist = makelist(next_instr);
+																						$$.truelist = makelist(nextInstruction);
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -1463,9 +1523,9 @@ equality_expression:            relational_expression {
 																						else{
 																							int o;
 																						}
-																						$$.falselist = makelist(next_instr+1);
-																						glob_quad.emit(Q_IF_EQUAL,$1.loc->name,$3.loc->name,"-1");
-																						glob_quad.emit(Q_GOTO,"-1");
+																						$$.falselist = makelist(nextInstruction+1);
+																						globalQuadArray.emit(Q_IF_EQUAL,$1.symTPtr->name,$3.symTPtr->name,"-1");
+																						globalQuadArray.emit(Q_GOTO,"-1");
 																						for(int l=0;l<10;++l) {
 																							int pp = 0;
 																						}
@@ -1494,8 +1554,8 @@ equality_expression:            relational_expression {
 																							else{
 																								int o;
 																							}
-																							$$.truelist = makelist(next_instr);
-																							$$.falselist = makelist(next_instr+1);
+																							$$.truelist = makelist(nextInstruction);
+																							$$.falselist = makelist(nextInstruction+1);
 																							for(int l=0;l<10;++l) {
 																								int pp = 0;
 																							}
@@ -1507,16 +1567,16 @@ equality_expression:            relational_expression {
 																							else{
 																								int n;
 																							}
-																							glob_quad.emit(Q_IF_NOT_EQUAL,$1.loc->name,$3.loc->name,"-1");
-																							glob_quad.emit(Q_GOTO,"-1");
+																							globalQuadArray.emit(Q_IF_NOT_EQUAL,$1.symTPtr->name,$3.symTPtr->name,"-1");
+																							globalQuadArray.emit(Q_GOTO,"-1");
 																					 };
 
 AND_expression :                equality_expression {
 														$$ = $1;
 													}|
 								AND_expression '&' equality_expression {
-																			$$.loc = curr_st->gentemp($1.type);
-																			$$.type = $$.loc->tp_n;
+																			$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																			$$.type = $$.symTPtr->type;
 																			int l = 0;
 																			int k = 2;
 																			for(int i=0;i<10;++i) {
@@ -1530,7 +1590,7 @@ AND_expression :                equality_expression {
 																			else{
 																				int o;
 																			}
-																			glob_quad.emit(Q_LOG_AND,$1.loc->name,$3.loc->name,$$.loc->name);
+																			globalQuadArray.emit(Q_LOG_AND,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																			for(int l=0;l<10;++l) {
 																				int pp = 0;
 																			}
@@ -1548,8 +1608,8 @@ exclusive_OR_expression:        AND_expression {
 													$$ = $1;
 											   }|
 								exclusive_OR_expression '^' AND_expression {
-																				$$.loc = curr_st->gentemp($1.type);
-																				$$.type = $$.loc->tp_n;
+																				$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																				$$.type = $$.symTPtr->type;
 																				int l = 0;
 																				int k = 2;
 																				for(int i=0;i<10;++i) {
@@ -1563,15 +1623,15 @@ exclusive_OR_expression:        AND_expression {
 																				else{
 																					int o;
 																				}
-																				glob_quad.emit(Q_XOR,$1.loc->name,$3.loc->name,$$.loc->name);
+																				globalQuadArray.emit(Q_XOR,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																		   };
 
 inclusive_OR_expression:        exclusive_OR_expression {
 															$$ = $1;
 														}|
 								inclusive_OR_expression '|' exclusive_OR_expression {
-																						$$.loc = curr_st->gentemp($1.type);
-																						$$.type = $$.loc->tp_n;
+																						$$.symTPtr = currentSymbolTable->gentemp($1.type);
+																						$$.type = $$.symTPtr->type;
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -1585,17 +1645,17 @@ inclusive_OR_expression:        exclusive_OR_expression {
 																						else{
 																							int o;
 																						}
-																						glob_quad.emit(Q_LOG_OR,$1.loc->name,$3.loc->name,$$.loc->name);
+																						globalQuadArray.emit(Q_LOG_OR,$1.symTPtr->name,$3.symTPtr->name,$$.symTPtr->name);
 																					};
 
 logical_AND_expression:         inclusive_OR_expression {
 															$$ = $1;
 														}|
 								logical_AND_expression AND M inclusive_OR_expression {
-																						if($1.type->basetp != tp_bool)
-																							conv2Bool(&$1);
-																						if($4.type->basetp != tp_bool)
-																							conv2Bool(&$4);
+																						if($1.type->type != tp_bool)
+																							CONV2BOOL(&$1);
+																						if($4.type->type != tp_bool)
+																							CONV2BOOL(&$4);
 																						backpatch($1.truelist,$3);
 																						$$.type = new symbolType(tp_bool);
 																						int l = 0;
@@ -1619,10 +1679,10 @@ logical_OR_expression:          logical_AND_expression {
 															$$ = $1;
 													   }|
 								logical_OR_expression OR M logical_AND_expression   {
-																						if($1.type->basetp != tp_bool)
-																							conv2Bool(&$1);
-																						if($4.type->basetp != tp_bool)
-																							conv2Bool(&$4);
+																						if($1.type->type != tp_bool)
+																							CONV2BOOL(&$1);
+																						if($4.type->type != tp_bool)
+																							CONV2BOOL(&$4);
 																						backpatch($1.falselist,$3);
 																						$$.type = new symbolType(tp_bool);
 																						int l = 0;
@@ -1647,11 +1707,11 @@ conditional_expression:         logical_OR_expression {
 															$$ = $1;
 													  }|
 								logical_OR_expression N '?' M expression N ':' M conditional_expression {
-																											$$.loc = curr_st->gentemp($5.type);
-																											$$.type = $$.loc->tp_n;
-																											glob_quad.emit(Q_ASSIGN,$9.loc->name,$$.loc->name);
-																											list* TEMP_LIST = makelist(next_instr);
-																											glob_quad.emit(Q_GOTO,"-1");
+																											$$.symTPtr = currentSymbolTable->gentemp($5.type);
+																											$$.type = $$.symTPtr->type;
+																											globalQuadArray.emit(Q_ASSIGN,$9.symTPtr->name,$$.symTPtr->name);
+																											list* TEMP_LIST = makelist(nextInstruction);
+																											globalQuadArray.emit(Q_GOTO,"-1");
 																											int l = 0;
 																											int k = 2;
 																											for(int i=0;i<10;++i) {
@@ -1665,15 +1725,15 @@ conditional_expression:         logical_OR_expression {
 																											else{
 																												int o;
 																											}
-																											backpatch($6,next_instr);
-																											glob_quad.emit(Q_ASSIGN,$5.loc->name,$$.loc->name);
-																											TEMP_LIST = merge(TEMP_LIST,makelist(next_instr));
-																											glob_quad.emit(Q_GOTO,"-1");
-																											backpatch($2,next_instr);
-																											conv2Bool(&$1);
+																											backpatch($6,nextInstruction);
+																											globalQuadArray.emit(Q_ASSIGN,$5.symTPtr->name,$$.symTPtr->name);
+																											TEMP_LIST = merge(TEMP_LIST,makelist(nextInstruction));
+																											globalQuadArray.emit(Q_GOTO,"-1");
+																											backpatch($2,nextInstruction);
+																											CONV2BOOL(&$1);
 																											backpatch($1.truelist,$4);
 																											backpatch($1.falselist,$8);
-																											backpatch(TEMP_LIST,next_instr);
+																											backpatch(TEMP_LIST,nextInstruction);
 																										};
 
 assignment_operator:            '='                                                     |
@@ -1693,7 +1753,7 @@ assignment_expression:          conditional_expression {
 														}|
 								unary_expression assignment_operator assignment_expression {
 																								//LDereferencing
-																								//printf("hoboo --> %s\n",$1.loc->name.c_str());
+																								//printf("hoboo --> %s\n",$1.symTPtr->name.c_str());
 																								if($1.isPointer)
 																								{
 																									//printf("Hookah bar\n");
@@ -1710,7 +1770,7 @@ assignment_expression:          conditional_expression {
 																									else{
 																										int o;
 																									}
-																									glob_quad.emit(Q_LDEREF,$3.loc->name,$1.loc->name);
+																									globalQuadArray.emit(Q_LDEREF,$3.symTPtr->name,$1.symTPtr->name);
 																								}
 																								typecheck(&$1,&$3,true);
 																								if($1.arr != NULL)
@@ -1728,14 +1788,14 @@ assignment_expression:          conditional_expression {
 																									else{
 																										int o;
 																									}
-																									glob_quad.emit(Q_LINDEX,$1.loc->name,$3.loc->name,$1.arr->name);
+																									globalQuadArray.emit(Q_LINDEX,$1.symTPtr->name,$3.symTPtr->name,$1.arr->name);
 																								}
 																								else if(!$1.isPointer)
-																									glob_quad.emit(Q_ASSIGN,$3.loc->name,$1.loc->name);
-																								$$.loc = curr_st->gentemp($3.type);
-																								$$.type = $$.loc->tp_n;
+																									globalQuadArray.emit(Q_ASSIGN,$3.symTPtr->name,$1.symTPtr->name);
+																								$$.symTPtr = currentSymbolTable->gentemp($3.type);
+																								$$.type = $$.symTPtr->type;
 																								//printf("assgi hobobob %s == %s\n",)
-																								glob_quad.emit(Q_ASSIGN,$3.loc->name,$$.loc->name);
+																								globalQuadArray.emit(Q_ASSIGN,$3.symTPtr->name,$$.symTPtr->name);
 																								int l = 0;
 																								int k = 2;
 																								for(int i=0;i<10;++i) {
@@ -1749,7 +1809,7 @@ assignment_expression:          conditional_expression {
 																								else{
 																									int o;
 																								}
-																								//printf("assign %s = %s\n",$3.loc->name.c_str(),$$.loc->name.c_str());
+																								//printf("assign %s = %s\n",$3.symTPtr->name.c_str(),$$.symTPtr->name.c_str());
 																							};
 
 /*A constant value of this expression exists*/
@@ -1767,9 +1827,9 @@ expression :                    assignment_expression {
 /*Declarations*/
 
 declaration:                    declaration_specifiers init_declarator_list_opt ';' {
-																						if($2.loc != NULL && $2.type != NULL && $2.type->basetp == tp_func)
+																						if($2.symTPtr != NULL && $2.type != NULL && $2.type->type == tp_func)
 																						{
-																							/*Delete curr_st*/
+																							/*Delete currentSymbolTable*/
 																							int l = 0;
 																							int k = 2;
 																							for(int i=0;i<10;++i) {
@@ -1783,12 +1843,12 @@ declaration:                    declaration_specifiers init_declarator_list_opt 
 																							else{
 																								int o;
 																							}
-																							curr_st = new symtab();
+																							currentSymbolTable = new symbolTable();
 																						}
 																					};
 
 init_declarator_list_opt:       init_declarator_list {
-														if($1.type != NULL && $1.type->basetp == tp_func)
+														if($1.type != NULL && $1.type->type == tp_func)
 														{
 															$$ = $1;
 															int l = 0;
@@ -1807,7 +1867,7 @@ init_declarator_list_opt:       init_declarator_list {
 														}
 													 }|
 								/*epsilon*/ {
-												$$.loc = NULL;
+												$$.symTPtr = NULL;
 											};
 
 declaration_specifiers:         storage_class_specifier declaration_specifiers_opt {}|
@@ -1839,7 +1899,7 @@ init_declarator_list:           init_declarator {
 
 init_declarator:                declarator {
 												/*Nothing to be done here*/
-												if($1.type != NULL && $1.type->basetp == tp_func)
+												if($1.type != NULL && $1.type->type == tp_func)
 												{
 													$$ = $1;
 													int l = 0;
@@ -1861,10 +1921,10 @@ init_declarator:                declarator {
 																//initializations of declarators
 																if($3.type!=NULL)
 																{
-																if($3.type->basetp==tp_int)
+																if($3.type->type==tp_int)
 																{
-																	$1.loc->i_val.int_val= $3.loc->i_val.int_val;
-																	$1.loc->isInitialized = true;
+																	$1.symTPtr->_init_val._INT_INITVAL= $3.symTPtr->_init_val._INT_INITVAL;
+																	$1.symTPtr->isInitialized = true;
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -1878,11 +1938,11 @@ init_declarator:                declarator {
 																	else{
 																		int o;
 																	}
-																	symdata *temp_ver=curr_st->search($1.loc->name);
+																	symbol *temp_ver=currentSymbolTable->search($1.symTPtr->name);
 																	if(temp_ver!=NULL)
 																	{
-																	//printf("po %s = %s\n",$1.loc->name.c_str(),$3.loc->name.c_str());
-																	temp_ver->i_val.int_val= $3.loc->i_val.int_val;
+																	//printf("po %s = %s\n",$1.symTPtr->name.c_str(),$3.symTPtr->name.c_str());
+																	temp_ver->_init_val._INT_INITVAL= $3.symTPtr->_init_val._INT_INITVAL;
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -1899,10 +1959,10 @@ init_declarator:                declarator {
 																	temp_ver->isInitialized = true;
 																	}
 																}
-																else if($3.type->basetp==tp_char)
+																else if($3.type->type==tp_char)
 																{
-																	$1.loc->i_val.char_val= $3.loc->i_val.char_val;
-																	$1.loc->isInitialized = true;
+																	$1.symTPtr->_init_val._CHAR_INITVAL= $3.symTPtr->_init_val._CHAR_INITVAL;
+																	$1.symTPtr->isInitialized = true;
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -1916,42 +1976,36 @@ init_declarator:                declarator {
 																	else{
 																		int o;
 																	}
-																	symdata *temp_ver=curr_st->search($1.loc->name);
+																	symbol *temp_ver=currentSymbolTable->search($1.symTPtr->name);
 																	if(temp_ver!=NULL)
-																	{temp_ver->i_val.char_val= $3.loc->i_val.char_val;
+																	{temp_ver->_init_val._CHAR_INITVAL= $3.symTPtr->_init_val._CHAR_INITVAL;
 																		temp_ver->isInitialized = true;
 																	}
 																}
 																}
-																//printf("%s = %s\n",$1.loc->name.c_str(),$3.loc->name.c_str());
+																//printf("%s = %s\n",$1.symTPtr->name.c_str(),$3.symTPtr->name.c_str());
 																//typecheck(&$1,&$3,true);
-																glob_quad.emit(Q_ASSIGN,$3.loc->name,$1.loc->name);
+																globalQuadArray.emit(Q_ASSIGN,$3.symTPtr->name,$1.symTPtr->name);
 															};
 
 storage_class_specifier:        EXTERN {}|
 								STATIC {};
 
 type_specifier:                 VOID {
-										glob_type = new symbolType(tp_void);
+										globalType = new symbolType(tp_void);
 									}|
 								CHAR {
-										glob_type = new symbolType(tp_char);
+										globalType = new symbolType(tp_char);
 									}|
 								SHORT {}|
 								INT {
-										glob_type = new symbolType(tp_int);
+										globalType = new symbolType(tp_int);
 									}|
 								LONG {}|
 								FLOAT {}|
 								DOUBLE {
-											glob_type = new symbolType(tp_double);
-										}|
-								SIGNED {}|
-								UNSIGNED {}|
-								BOOL {}|
-								COMPLEX {}|
-								IMAGINARY {}|
-								enum_specifier {};
+											globalType = new symbolType(tp_double);
+										};
 
 specifier_qualifier_list:       type_specifier specifier_qualifier_list_opt {
 																				/*----------*/
@@ -1961,35 +2015,6 @@ specifier_qualifier_list:       type_specifier specifier_qualifier_list_opt {
 specifier_qualifier_list_opt:   specifier_qualifier_list {}|
 								/*epsilon*/ {};
 
-enum_specifier:                 ENUM identifier_opt '{' enumerator_list '}' {}|
-								ENUM identifier_opt '{' enumerator_list ',' '}' {}|
-								ENUM IDENTIFIER {};
-
-identifier_opt:                 IDENTIFIER {
-												$$.loc  = curr_st->lookup(*$1.name);
-												//printf("%s\n",(*$1.name).c_str());
-												int l = 0;
-												int k = 2;
-												for(int i=0;i<10;++i) {
-													int l = 0;
-												}
-												if(k) {
-													for(int i=0;i<10;++i) {
-														int k;
-													}
-												}
-												else{
-													int o;
-												}
-												$$.type = new symbolType(glob_type->basetp);
-											}|
-								/*epsilon*/ {};
-
-enumerator_list:                enumerator {}|
-								enumerator_list ',' enumerator {};
-
-enumerator:                     enumeration_constant {}|
-								enumeration_constant '=' constant_expression {};
 
 type_qualifier:                 CONST {}|
 								RESTRICT {}|
@@ -2017,7 +2042,7 @@ declarator :                    pointer_opt direct_declarator {
 																}
 																else
 																{
-																	if($2.loc->tp_n->basetp != tp_ptr)
+																	if($2.symTPtr->type->type != tp_ptr)
 																	{
 																		symbolType * test = $1.type;
 
@@ -2037,19 +2062,19 @@ declarator :                    pointer_opt direct_declarator {
 																		{
 																			test = test->next;
 																		}
-																		test->next = $2.loc->tp_n;
-																		$2.loc->tp_n = $1.type;
+																		test->next = $2.symTPtr->type;
+																		$2.symTPtr->type = $1.type;
 																	}
 																}
 
-																if($2.type != NULL && $2.type->basetp == tp_func)
+																if($2.type != NULL && $2.type->type == tp_func)
 																{
 																	$$ = $2;
 																}
 																else
 																{
 																	//its not a function
-																	$2.loc->size = $2.loc->tp_n->getSize();
+																	$2.symTPtr->width = $2.symTPtr->type->sizeOfType();
 																	for(int l=0;l<10;++l) {
 																		int pp = 0;
 																	}
@@ -2061,8 +2086,8 @@ declarator :                    pointer_opt direct_declarator {
 																	else{
 																		int n;
 																	}
-																	$2.loc->offset = curr_st->offset;
-																	curr_st->offset += $2.loc->size;
+																	$2.symTPtr->offset = currentSymbolTable->offset;
+																	currentSymbolTable->offset += $2.symTPtr->width;
 																	int l = 0;
 																	int k = 2;
 																	for(int i=0;i<10;++i) {
@@ -2077,7 +2102,7 @@ declarator :                    pointer_opt direct_declarator {
 																		int o;
 																	}
 																	$$ = $2;
-																	$$.type = $$.loc->tp_n;
+																	$$.type = $$.symTPtr->type;
 																}
 															};
 
@@ -2089,7 +2114,7 @@ pointer_opt:                    pointer {
 											};
 
 direct_declarator:              IDENTIFIER {
-													$$.loc = curr_st->lookup(*$1.name);
+													$$.symTPtr = currentSymbolTable->lookup(*$1.name);
 													for(int l=0;l<10;++l) {
 														int pp = 0;
 													}
@@ -2101,7 +2126,7 @@ direct_declarator:              IDENTIFIER {
 													else{
 														int n;
 													}
-													//printf("name: %s\n",curr_st->name.c_str());
+													//printf("name: %s\n",currentSymbolTable->name.c_str());
 													//printf("2nd %s\n",(*$1.name).c_str());
 													int l = 0;
 													int k = 2;
@@ -2117,7 +2142,7 @@ direct_declarator:              IDENTIFIER {
 														int o;
 													}
 													//printf("Hello5\n");
-													if($$.loc->var_type == "")
+													if($$.symTPtr->var_type == "")
 													{
 														//Type initialization
 														int l = 0;
@@ -2133,18 +2158,18 @@ direct_declarator:              IDENTIFIER {
 														else{
 															int o;
 														}
-														$$.loc->var_type = "local";
-														$$.loc->tp_n = new symbolType(glob_type->basetp);
-														//$$.loc->tp_n->print();
+														$$.symTPtr->var_type = "local";
+														$$.symTPtr->type = new symbolType(globalType->type);
+														//$$.symTPtr->type->print();
 													}
-													$$.type = $$.loc->tp_n;
+													$$.type = $$.symTPtr->type;
 											}|
 								'(' declarator ')' {
 														$$ = $2;
 													}|
 								direct_declarator '[' type_qualifier_list_opt assignment_expression_opt ']' {
 																												//printf("Hello\n");
-																												if($1.type->basetp == tp_arr)
+																												if($1.type->type == tp_arr)
 																												{
 																													/*if type is already an arr*/
 																													symbolType * typ1 = $1.type,*typ = $1.type;
@@ -2167,7 +2192,7 @@ direct_declarator:              IDENTIFIER {
 																														typ1 = typ1->next;
 																														typ = typ->next;
 																													}
-																													typ->next = new symbolType(tp_arr,$4.loc->i_val.int_val,typ1);
+																													typ->next = new symbolType(tp_arr,$4.symTPtr->_init_val._INT_INITVAL,typ1);
 																												}
 																												else
 																												{
@@ -2196,21 +2221,21 @@ direct_declarator:              IDENTIFIER {
 																													else{
 																														int o;
 																													}
-																													if($4.loc == NULL)
+																													if($4.symTPtr == NULL)
 																														$1.type = new symbolType(tp_arr,-1,$1.type);
 																													else
-																														$1.type = new symbolType(tp_arr,$4.loc->i_val.int_val,$1.type);
+																														$1.type = new symbolType(tp_arr,$4.symTPtr->_init_val._INT_INITVAL,$1.type);
 																												}
 																												$$ = $1;
-																												$$.loc->tp_n = $$.type;
+																												$$.symTPtr->type = $$.type;
 																											}|
 								direct_declarator '[' STATIC type_qualifier_list_opt assignment_expression ']' {}|
 								direct_declarator '[' type_qualifier_list STATIC assignment_expression ']' {}|
 								direct_declarator '[' type_qualifier_list_opt '*' ']' {/*Not sure but mostly we don't have to implement this*/}|
 								direct_declarator '(' parameter_type_list ')' {
-																				   int params_no=curr_st->no_params;
+																				   int params_no=currentSymbolTable->emptyArgList;
 																				   //printf("no.ofparameters-->%d\n",params_no);
-																				   curr_st->no_params=0;
+																				   currentSymbolTable->emptyArgList=0;
 																				   int dec_params=0;
 																				   int l = 0;
 																					int k = 2;
@@ -2226,14 +2251,14 @@ direct_declarator:              IDENTIFIER {
 																						int o;
 																					}
 																				   int over_params=params_no;
-																				   for(int i=curr_st->symbol_tab.size()-1;i>=0;i--)
+																				   for(int i=currentSymbolTable->symbolTabList.size()-1;i>=0;i--)
 																				   {
-																						//printf("what-->%s\n",curr_st->symbol_tab[i]->name.c_str());
+																						//printf("what-->%s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
 																					}
-																				   for(int i=curr_st->symbol_tab.size()-1;i>=0;i--)
+																				   for(int i=currentSymbolTable->symbolTabList.size()-1;i>=0;i--)
 																				   {
-																						//printf("mazaknaminST-->%s\n",curr_st->symbol_tab[i]->name.c_str());
-																						string detect=curr_st->symbol_tab[i]->name;
+																						//printf("mazaknaminST-->%s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
+																						string detect=currentSymbolTable->symbolTabList[i]->name;
 																						if(over_params==0)
 																						{
 																							int l = 0;
@@ -2284,8 +2309,8 @@ direct_declarator:              IDENTIFIER {
 																				   }
 																				   params_no+=dec_params;
 																				   //printf("no.ofparameters-->%d\n",params_no);
-																				   int temp_i=curr_st->symbol_tab.size()-params_no;
-																				   symdata * new_func = glob_st->search(curr_st->symbol_tab[temp_i-1]->name);
+																				   int temp_i=currentSymbolTable->symbolTabList.size()-params_no;
+																				   symbol * new_func = globalSymbolTable->search(currentSymbolTable->symbolTabList[temp_i-1]->name);
 																					//printf("Hello1\n");
 																					for(int i=0;i<10;++i) {
 																						int l = 0;
@@ -2298,12 +2323,12 @@ direct_declarator:              IDENTIFIER {
 																					else{
 																						int o;
 																					}
-																					//printf("%s\n",curr_st->symbol_tab[0]->name.c_str());
-																					//printf("no. of params-> %d\n",curr_st->no_params);
+																					//printf("%s\n",currentSymbolTable->symbolTabList[0]->name.c_str());
+																					//printf("no. of params-> %d\n",currentSymbolTable->emptyArgList);
 																					if(new_func == NULL)
 																					{
-																						new_func = glob_st->lookup(curr_st->symbol_tab[temp_i-1]->name);
-																						$$.loc = curr_st->symbol_tab[temp_i-1];
+																						new_func = globalSymbolTable->lookup(currentSymbolTable->symbolTabList[temp_i-1]->name);
+																						$$.symTPtr = currentSymbolTable->symbolTabList[temp_i-1];
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -2319,13 +2344,13 @@ direct_declarator:              IDENTIFIER {
 																						}
 																						for(int i=0;i<(temp_i-1);i++)
 																						{
-																							curr_st->symbol_tab[i]->ispresent=false;
-																							if(curr_st->symbol_tab[i]->var_type=="local"||curr_st->symbol_tab[i]->var_type=="temp")
+																							currentSymbolTable->symbolTabList[i]->isValid=false;
+																							if(currentSymbolTable->symbolTabList[i]->var_type=="local"||currentSymbolTable->symbolTabList[i]->var_type=="temp")
 																							{
-																								symdata *glob_var=glob_st->search(curr_st->symbol_tab[i]->name);
+																								symbol *glob_var=globalSymbolTable->search(currentSymbolTable->symbolTabList[i]->name);
 																								if(glob_var==NULL)
 																								{
-																									//printf("glob_var-->%s\n",curr_st->symbol_tab[i]->name.c_str());
+																									//printf("glob_var-->%s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
 																									for(int l=0;l<10;++l) {
 																										int pp = 0;
 																									}
@@ -2337,11 +2362,11 @@ direct_declarator:              IDENTIFIER {
 																									else{
 																										int n;
 																									}
-																									glob_var=glob_st->lookup(curr_st->symbol_tab[i]->name);
-																									int t_size=curr_st->symbol_tab[i]->tp_n->getSize();
-																									glob_var->offset=glob_st->offset;
-																									glob_var->size=t_size;
-																									glob_st->offset+=t_size;
+																									glob_var=globalSymbolTable->lookup(currentSymbolTable->symbolTabList[i]->name);
+																									int t_size=currentSymbolTable->symbolTabList[i]->type->sizeOfType();
+																									glob_var->offset=globalSymbolTable->offset;
+																									glob_var->width=t_size;
+																									globalSymbolTable->offset+=t_size;
 																									int l = 0;
 																									int k = 2;
 																									for(int i1=0;i1<10;++i1) {
@@ -2355,13 +2380,13 @@ direct_declarator:              IDENTIFIER {
 																									else{
 																										int o;
 																									}
-																									glob_var->nest_tab=glob_st;
-																									glob_var->var_type=curr_st->symbol_tab[i]->var_type;
-																									glob_var->tp_n=curr_st->symbol_tab[i]->tp_n;
-																									if(curr_st->symbol_tab[i]->isInitialized)
+																									glob_var->nested=globalSymbolTable;
+																									glob_var->var_type=currentSymbolTable->symbolTabList[i]->var_type;
+																									glob_var->type=currentSymbolTable->symbolTabList[i]->type;
+																									if(currentSymbolTable->symbolTabList[i]->isInitialized)
 																									{
-																										glob_var->isInitialized=curr_st->symbol_tab[i]->isInitialized;
-																										glob_var->i_val=curr_st->symbol_tab[i]->i_val;
+																										glob_var->isInitialized=currentSymbolTable->symbolTabList[i]->isInitialized;
+																										glob_var->_init_val=currentSymbolTable->symbolTabList[i]->_init_val;
 																										int l = 0;
 																										int k = 2;
 																										for(int i2=0;i2<10;++i2) {
@@ -2383,7 +2408,7 @@ direct_declarator:              IDENTIFIER {
 																						if(new_func->var_type == "")
 																						{
 																							// Declaration of the function for the first time
-																							new_func->tp_n = CopyType(curr_st->symbol_tab[temp_i-1]->tp_n);
+																							new_func->type = CopyType(currentSymbolTable->symbolTabList[temp_i-1]->type);
 																							for(int l=0;l<10;++l) {
 																								int pp = 0;
 																							}
@@ -2397,7 +2422,7 @@ direct_declarator:              IDENTIFIER {
 																							}
 																							new_func->var_type = "func";
 																							new_func->isInitialized = false;
-																							new_func->nest_tab = curr_st;
+																							new_func->nested = currentSymbolTable;
 																							int l = 0;
 																							int k = 2;
 																							for(int i=0;i<10;++i) {
@@ -2411,31 +2436,31 @@ direct_declarator:              IDENTIFIER {
 																							else{
 																								int o;
 																							}
-																							curr_st->name = curr_st->symbol_tab[temp_i-1]->name;
-																							//printf("naminST-->%s\n",curr_st->symbol_tab[temp_i-1]->name.c_str());
+																							currentSymbolTable->name = currentSymbolTable->symbolTabList[temp_i-1]->name;
+																							//printf("naminST-->%s\n",currentSymbolTable->symbolTabList[temp_i-1]->name.c_str());
 																							//printf("oye\n");
-																							/*for(int i=0;i<curr_st->symbol_tab.size();i++)
+																							/*for(int i=0;i<currentSymbolTable->symbolTabList.size();i++)
 																							{
-																								printf("naminST-->%s\n",curr_st->symbol_tab[i]->name.c_str());
+																								printf("naminST-->%s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
 																							}*/
-																							curr_st->symbol_tab[temp_i-1]->name = "retVal";
-																							curr_st->symbol_tab[temp_i-1]->var_type = "return";
-																							curr_st->symbol_tab[temp_i-1]->size = curr_st->symbol_tab[temp_i-1]->tp_n->getSize();
-																							curr_st->symbol_tab[temp_i-1]->offset = 0;
-																							curr_st->offset = 16;
+																							currentSymbolTable->symbolTabList[temp_i-1]->name = "retVal";
+																							currentSymbolTable->symbolTabList[temp_i-1]->var_type = "return";
+																							currentSymbolTable->symbolTabList[temp_i-1]->width = currentSymbolTable->symbolTabList[temp_i-1]->type->sizeOfType();
+																							currentSymbolTable->symbolTabList[temp_i-1]->offset = 0;
+																							currentSymbolTable->offset = 16;
 																							int count=0;
-																							for(int i=(curr_st->symbol_tab.size())-params_no;i<curr_st->symbol_tab.size();i++)
+																							for(int i=(currentSymbolTable->symbolTabList.size())-params_no;i<currentSymbolTable->symbolTabList.size();i++)
 																							{
-																								//printf("%s -> %s\n",curr_st->symbol_tab[i]->name.c_str(),curr_st->symbol_tab[i]->var_type.c_str());
-																								curr_st->symbol_tab[i]->var_type = "param";
-																								curr_st->symbol_tab[i]->offset = count- curr_st->symbol_tab[i]->size;
-																								count=count-curr_st->symbol_tab[i]->size;
+																								//printf("%s -> %s\n",currentSymbolTable->symbolTabList[i]->name.c_str(),currentSymbolTable->symbolTabList[i]->var_type.c_str());
+																								currentSymbolTable->symbolTabList[i]->var_type = "param";
+																								currentSymbolTable->symbolTabList[i]->offset = count- currentSymbolTable->symbolTabList[i]->width;
+																								count=count-currentSymbolTable->symbolTabList[i]->width;
 																							}
 																						}
 																					}
 																					else
 																					{
-																						curr_st = new_func->nest_tab;
+																						currentSymbolTable = new_func->nested;
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -2450,13 +2475,13 @@ direct_declarator:              IDENTIFIER {
 																							int o;
 																						}
 																					}
-																					curr_st->start_quad = next_instr;
-																					$$.loc = new_func;
+																					currentSymbolTable->initQuad = nextInstruction;
+																					$$.symTPtr = new_func;
 																					$$.type = new symbolType(tp_func);
 																				}|
 								direct_declarator '(' identifier_list_opt ')' {
-																				int temp_i=curr_st->symbol_tab.size();
-																				symdata * new_func = glob_st->search(curr_st->symbol_tab[temp_i-1]->name);
+																				int temp_i=currentSymbolTable->symbolTabList.size();
+																				symbol * new_func = globalSymbolTable->search(currentSymbolTable->symbolTabList[temp_i-1]->name);
 																				//printf("Hello3\n");
 																				int l = 0;
 																				int k = 2;
@@ -2471,12 +2496,12 @@ direct_declarator:              IDENTIFIER {
 																				else{
 																					int o;
 																				}
-																				//printf("glob_st %s\n",curr_st->symbol_tab[temp_i-1]->name.c_str());
-																				//printf("symbol_tabsize %d\n",curr_st->symbol_tab.size());
-																				/*if(curr_st->symbol_tab.size()>2)
+																				//printf("globalSymbolTable %s\n",currentSymbolTable->symbolTabList[temp_i-1]->name.c_str());
+																				//printf("symbol_tabsize %d\n",currentSymbolTable->symbolTabList.size());
+																				/*if(currentSymbolTable->symbolTabList.size()>2)
 																				{
 																					//printf("Namestarted\n");
-																					printf("%s\n",curr_st->symbol_tab[0]->name.c_str());
+																					printf("%s\n",currentSymbolTable->symbolTabList[0]->name.c_str());
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -2490,8 +2515,8 @@ direct_declarator:              IDENTIFIER {
 																					else{
 																						int o;
 																					}
-																					printf("%s\n",curr_st->symbol_tab[1]->name.c_str());
-																					printf("%s\n",curr_st->symbol_tab[2]->name.c_str());
+																					printf("%s\n",currentSymbolTable->symbolTabList[1]->name.c_str());
+																					printf("%s\n",currentSymbolTable->symbolTabList[2]->name.c_str());
 																				}*/
 																				if(new_func == NULL)
 																				{
@@ -2506,8 +2531,8 @@ direct_declarator:              IDENTIFIER {
 																					else{
 																						int n;
 																					}
-																					new_func = glob_st->lookup(curr_st->symbol_tab[temp_i-1]->name);
-																					$$.loc = curr_st->symbol_tab[temp_i-1];
+																					new_func = globalSymbolTable->lookup(currentSymbolTable->symbolTabList[temp_i-1]->name);
+																					$$.symTPtr = currentSymbolTable->symbolTabList[temp_i-1];
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -2523,15 +2548,15 @@ direct_declarator:              IDENTIFIER {
 																					}
 																					for(int i=0;i<temp_i-1;i++)
 																					{
-																						curr_st->symbol_tab[i]->ispresent=false;
-																						if(curr_st->symbol_tab[i]->var_type=="local"||curr_st->symbol_tab[i]->var_type=="temp")
+																						currentSymbolTable->symbolTabList[i]->isValid=false;
+																						if(currentSymbolTable->symbolTabList[i]->var_type=="local"||currentSymbolTable->symbolTabList[i]->var_type=="temp")
 																						{
-																							symdata *glob_var=glob_st->search(curr_st->symbol_tab[i]->name);
+																							symbol *glob_var=globalSymbolTable->search(currentSymbolTable->symbolTabList[i]->name);
 																							if(glob_var==NULL)
 																							{
-																								//printf("glob_var-->%s\n",curr_st->symbol_tab[i]->name.c_str());
-																								glob_var=glob_st->lookup(curr_st->symbol_tab[i]->name);
-																								int t_size=curr_st->symbol_tab[i]->tp_n->getSize();
+																								//printf("glob_var-->%s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
+																								glob_var=globalSymbolTable->lookup(currentSymbolTable->symbolTabList[i]->name);
+																								int t_size=currentSymbolTable->symbolTabList[i]->type->sizeOfType();
 																								for(int l=0;l<10;++l) {
 																									int pp = 0;
 																								}
@@ -2543,9 +2568,9 @@ direct_declarator:              IDENTIFIER {
 																								else{
 																									int n;
 																								}
-																								glob_var->offset=glob_st->offset;
-																								glob_var->size=t_size;
-																								glob_st->offset+=t_size;
+																								glob_var->offset=globalSymbolTable->offset;
+																								glob_var->width=t_size;
+																								globalSymbolTable->offset+=t_size;
 																								int l = 0;
 																								int k = 2;
 																								for(int i3=0;i3<10;++i3) {
@@ -2559,13 +2584,13 @@ direct_declarator:              IDENTIFIER {
 																								else{
 																									int o;
 																								}
-																								glob_var->nest_tab=glob_st;
-																								glob_var->var_type=curr_st->symbol_tab[i]->var_type;
-																								glob_var->tp_n=curr_st->symbol_tab[i]->tp_n;
-																								if(curr_st->symbol_tab[i]->isInitialized)
+																								glob_var->nested=globalSymbolTable;
+																								glob_var->var_type=currentSymbolTable->symbolTabList[i]->var_type;
+																								glob_var->type=currentSymbolTable->symbolTabList[i]->type;
+																								if(currentSymbolTable->symbolTabList[i]->isInitialized)
 																								{
-																									glob_var->isInitialized=curr_st->symbol_tab[i]->isInitialized;
-																									glob_var->i_val=curr_st->symbol_tab[i]->i_val;
+																									glob_var->isInitialized=currentSymbolTable->symbolTabList[i]->isInitialized;
+																									glob_var->_init_val=currentSymbolTable->symbolTabList[i]->_init_val;
 																								}
 																							}
 																						}
@@ -2573,10 +2598,10 @@ direct_declarator:              IDENTIFIER {
 																					if(new_func->var_type == "")
 																					{
 																						/*Function is being declared here for the first time*/
-																						new_func->tp_n = CopyType(curr_st->symbol_tab[temp_i-1]->tp_n);
+																						new_func->type = CopyType(currentSymbolTable->symbolTabList[temp_i-1]->type);
 																						new_func->var_type = "func";
 																						new_func->isInitialized = false;
-																						new_func->nest_tab = curr_st;
+																						new_func->nested = currentSymbolTable;
 																						int l = 0;
 																						int k = 2;
 																						for(int i=0;i<10;++i) {
@@ -2591,18 +2616,18 @@ direct_declarator:              IDENTIFIER {
 																							int o;
 																						}
 																						/*Change the first element to retval and change the rest to param*/
-																						curr_st->name = curr_st->symbol_tab[temp_i-1]->name;
-																						curr_st->symbol_tab[temp_i-1]->name = "retVal";
-																						curr_st->symbol_tab[temp_i-1]->var_type = "return";
-																						curr_st->symbol_tab[temp_i-1]->size = curr_st->symbol_tab[0]->tp_n->getSize();
-																						curr_st->symbol_tab[temp_i-1]->offset = 0;
-																						curr_st->offset = 16;
+																						currentSymbolTable->name = currentSymbolTable->symbolTabList[temp_i-1]->name;
+																						currentSymbolTable->symbolTabList[temp_i-1]->name = "retVal";
+																						currentSymbolTable->symbolTabList[temp_i-1]->var_type = "return";
+																						currentSymbolTable->symbolTabList[temp_i-1]->width = currentSymbolTable->symbolTabList[0]->type->sizeOfType();
+																						currentSymbolTable->symbolTabList[temp_i-1]->offset = 0;
+																						currentSymbolTable->offset = 16;
 																					}
 																				}
 																				else
 																				{
 																					// Already declared function. Therefore drop the new table and connect current symbol table pointer to the previously created funciton symbol table
-																					curr_st = new_func->nest_tab;
+																					currentSymbolTable = new_func->nested;
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -2617,8 +2642,8 @@ direct_declarator:              IDENTIFIER {
 																						int o;
 																					}
 																				}
-																				curr_st->start_quad = next_instr;
-																				$$.loc = new_func;
+																				currentSymbolTable->initQuad = nextInstruction;
+																				$$.symTPtr = new_func;
 																				for(int l=0;l<10;++l) {
 																					int pp = 0;
 																				}
@@ -2640,7 +2665,7 @@ assignment_expression_opt:      assignment_expression {
 															$$ = $1;
 														}|
 								/*epsilon*/ {
-												$$.loc = NULL;
+												$$.symTPtr = NULL;
 												int l = 0;
 												int k = 2;
 												for(int i=0;i<10;++i) {
@@ -2676,11 +2701,11 @@ parameter_type_list:            parameter_list {
 
 parameter_list:                 parameter_declaration {
 															/*---------*/
-															(curr_st->no_params)++;
+															(currentSymbolTable->emptyArgList)++;
 														}|
 								parameter_list ',' parameter_declaration {
 																			/*------------*/
-																			(curr_st->no_params)++;
+																			(currentSymbolTable->emptyArgList)++;
 																		};
 
 parameter_declaration:          declaration_specifiers declarator {
@@ -2796,7 +2821,7 @@ expression_opt:                 expression {
 										   }|
 								/*Epslion*/ {
 												/*Initialize Expression to NULL*/
-												$$.loc = NULL;
+												$$.symTPtr = NULL;
 											};
 
 selection_statement:            IF '(' expression N ')' M statement N ELSE M statement {
@@ -2813,9 +2838,9 @@ selection_statement:            IF '(' expression N ')' M statement N ELSE M sta
 																							else{
 																								int n;
 																							}
-																							$11 = merge($11,makelist(next_instr));
-																							glob_quad.emit(Q_GOTO,"-1");
-																							backpatch($4,next_instr);
+																							$11 = merge($11,makelist(nextInstruction));
+																							globalQuadArray.emit(Q_GOTO,"-1");
+																							backpatch($4,nextInstruction);
 																							int l = 0;
 																							int k = 2;
 																							for(int i=0;i<10;++i) {
@@ -2829,7 +2854,7 @@ selection_statement:            IF '(' expression N ')' M statement N ELSE M sta
 																							else{
 																								int o;
 																							}
-																							conv2Bool(&$3);
+																							CONV2BOOL(&$3);
 
 																							backpatch($3.truelist,$6);
 																							backpatch($3.falselist,$10);
@@ -2837,10 +2862,10 @@ selection_statement:            IF '(' expression N ')' M statement N ELSE M sta
 																						}|
 								IF '(' expression N ')' M statement %prec IF_CONFLICT{
 																		/*N is used for the falselist of expression to skip the block and M is used for truelist of expression*/
-																		$7 = merge($7,makelist(next_instr));
-																		glob_quad.emit(Q_GOTO,"-1");
-																		backpatch($4,next_instr);
-																		conv2Bool(&$3);
+																		$7 = merge($7,makelist(nextInstruction));
+																		globalQuadArray.emit(Q_GOTO,"-1");
+																		backpatch($4,nextInstruction);
+																		CONV2BOOL(&$3);
 																		int l = 0;
 																		int k = 2;
 																		for(int i=0;i<10;++i) {
@@ -2861,7 +2886,7 @@ selection_statement:            IF '(' expression N ')' M statement N ELSE M sta
 
 iteration_statement:            WHILE '(' M expression N ')' M statement {
 																			/*The first 'M' takes into consideration that the control will come again at the beginning of the condition checking.'N' here does the work of breaking condition i.e. it generate goto which wii be useful when we are exiting from while loop. Finally, the last 'M' is here to note the startinf statement that will be executed in every loop to populate the truelists of expression*/
-																			glob_quad.emit(Q_GOTO,$3);
+																			globalQuadArray.emit(Q_GOTO,$3);
 																			for(int l=0;l<10;++l) {
 																				int pp = 0;
 																			}
@@ -2873,9 +2898,9 @@ iteration_statement:            WHILE '(' M expression N ')' M statement {
 																			else{
 																				int n;
 																			}
-																			backpatch($8,$3);           /*S.nextlist to M1.instr*/
-																			backpatch($5,next_instr);    /*N1.nextlist to next_instr*/
-																			conv2Bool(&$4);
+																			backpatch($8,$3);           /*S._nextlist to M1._instruction*/
+																			backpatch($5,nextInstruction);    /*N1._nextlist to nextInstruction*/
+																			CONV2BOOL(&$4);
 																			int l = 0;
 																			int k = 2;
 																			for(int i=0;i<10;++i) {
@@ -2893,10 +2918,10 @@ iteration_statement:            WHILE '(' M expression N ')' M statement {
 																			$$ = $4.falselist;
 																		}|
 								DO M statement  WHILE '(' M expression N ')' ';' {
-																					/*M1 is used for coming back again to the statement as it stores the instruction which will be needed by the truelist of expression. M2 is neede as we have to again to check the condition which will be used to populate the nextlist of statements. Further N is used to prevent from fall through*/
-																					backpatch($8,next_instr);
-																					backpatch($3,$6);           /*S1.nextlist to M2.instr*/
-																					conv2Bool(&$7);
+																					/*M1 is used for coming back again to the statement as it stores the instruction which will be needed by the truelist of expression. M2 is neede as we have to again to check the condition which will be used to populate the _nextlist of statements. Further N is used to prevent from fall through*/
+																					backpatch($8,nextInstruction);
+																					backpatch($3,$6);           /*S1._nextlist to M2._instruction*/
+																					CONV2BOOL(&$7);
 																					int l = 0;
 																					int k = 2;
 																					for(int i=0;i<10;++i) {
@@ -2910,14 +2935,14 @@ iteration_statement:            WHILE '(' M expression N ')' M statement {
 																					else{
 																						int o;
 																					}
-																					backpatch($7.truelist,$2);  /*B.truelist to M1.instr*/
+																					backpatch($7.truelist,$2);  /*B.truelist to M1._instruction*/
 																					$$ = $7.falselist;
 																				}|
 								FOR '(' expression_opt ';' M expression_opt N ';' M expression_opt N ')' M statement {
-																													   /*M1 is used for coming back to check the epression at every iteration. N1 is used  for generating the goto which will be used for exit conditions. M2 is used for nextlist of statement and N2 is used for jump to check the expression and M3 is used for the truelist of expression*/
-																														backpatch($11,$5);          /*N2.nextlist to M1.instr*/
-																														backpatch($14,$9);          /*S.nextlist to M2.instr*/
-																														glob_quad.emit(Q_GOTO,$9);
+																													   /*M1 is used for coming back to check the epression at every iteration. N1 is used  for generating the goto which will be used for exit conditions. M2 is used for _nextlist of statement and N2 is used for jump to check the expression and M3 is used for the truelist of expression*/
+																														backpatch($11,$5);          /*N2._nextlist to M1._instruction*/
+																														backpatch($14,$9);          /*S._nextlist to M2._instruction*/
+																														globalQuadArray.emit(Q_GOTO,$9);
 																														for(int l=0;l<10;++l) {
 																															int pp = 0;
 																														}
@@ -2929,8 +2954,8 @@ iteration_statement:            WHILE '(' M expression N ')' M statement {
 																														else{
 																															int n;
 																														}
-																														backpatch($7,next_instr);    /*N1.nextlist to next_instr*/
-																														conv2Bool(&$6);
+																														backpatch($7,nextInstruction);    /*N1._nextlist to nextInstruction*/
+																														CONV2BOOL(&$6);
 																														int l = 0;
 																														int k = 2;
 																														for(int i=0;i<10;++i) {
@@ -2953,13 +2978,13 @@ jump_statement:                 GOTO IDENTIFIER ';' {}|
 								CONTINUE ';' {}|
 								BREAK ';' {}|
 								RETURN expression_opt ';' {
-																if($2.loc == NULL)
-																	glob_quad.emit(Q_RETURN);
+																if($2.symTPtr == NULL)
+																	globalQuadArray.emit(Q_RETURN);
 																else
 																{
 																	expression * dummy = new expression();
-																	dummy->loc = curr_st->symbol_tab[0];
-																	dummy->type = dummy->loc->tp_n;
+																	dummy->symTPtr = currentSymbolTable->symbolTabList[0];
+																	dummy->type = dummy->symTPtr->type;
 																	typecheck(dummy,&$2,true);
 																	int l = 0;
 																	int k = 2;
@@ -2975,7 +3000,7 @@ jump_statement:                 GOTO IDENTIFIER ';' {}|
 																		int o;
 																	}
 																	delete dummy;
-																	glob_quad.emit(Q_RETURN,$2.loc->name);
+																	globalQuadArray.emit(Q_RETURN,$2.symTPtr->name);
 																}
 																$$=NULL;
 														  };
@@ -2987,11 +3012,11 @@ translation_unit:               external_declaration                            
 external_declaration:           function_definition                                     |
 								declaration      {
 
-																						for(int i=0;i<curr_st->symbol_tab.size();i++)
+																						for(int i=0;i<currentSymbolTable->symbolTabList.size();i++)
 																						{
-																								//if(curr_st->symbol_tab[i]->ispresent==true&&curr_st->symbol_tab[i]->offset==-1)
+																								//if(currentSymbolTable->symbolTabList[i]->isValid==true&&currentSymbolTable->symbolTabList[i]->offset==-1)
 																								//{
-																									if(curr_st->symbol_tab[i]->nest_tab==NULL)
+																									if(currentSymbolTable->symbolTabList[i]->nested==NULL)
 																									{
 																										int l = 0;
 																										int k = 2;
@@ -3006,16 +3031,16 @@ external_declaration:           function_definition                             
 																										else{
 																											int o;
 																										}
-																									//printf("global --> %s\n",curr_st->symbol_tab[i]->name.c_str());
-																									if(curr_st->symbol_tab[i]->var_type=="local"||curr_st->symbol_tab[i]->var_type=="temp")
+																									//printf("global --> %s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
+																									if(currentSymbolTable->symbolTabList[i]->var_type=="local"||currentSymbolTable->symbolTabList[i]->var_type=="temp")
 																									{
-																										symdata *glob_var=glob_st->search(curr_st->symbol_tab[i]->name);
+																										symbol *glob_var=globalSymbolTable->search(currentSymbolTable->symbolTabList[i]->name);
 																										if(glob_var==NULL)
 																										{
-																											glob_var=glob_st->lookup(curr_st->symbol_tab[i]->name);
-																											//printf("glob_var-->%s\n",curr_st->symbol_tab[i]->name.c_str());
-																											int t_size=curr_st->symbol_tab[i]->tp_n->getSize();
-																											glob_var->offset=glob_st->offset;
+																											glob_var=globalSymbolTable->lookup(currentSymbolTable->symbolTabList[i]->name);
+																											//printf("glob_var-->%s\n",currentSymbolTable->symbolTabList[i]->name.c_str());
+																											int t_size=currentSymbolTable->symbolTabList[i]->type->sizeOfType();
+																											glob_var->offset=globalSymbolTable->offset;
 																											for(int l=0;l<10;++l) {
 																												int pp = 0;
 																											}
@@ -3027,9 +3052,9 @@ external_declaration:           function_definition                             
 																											else{
 																												int n;
 																											}
-																											glob_var->size=t_size;
-																											glob_st->offset+=t_size;
-																											glob_var->nest_tab=glob_st;
+																											glob_var->width=t_size;
+																											globalSymbolTable->offset+=t_size;
+																											glob_var->nested=globalSymbolTable;
 																											int l = 0;
 																											int k = 2;
 																											for(int i5=0;i5<10;++i5) {
@@ -3043,12 +3068,12 @@ external_declaration:           function_definition                             
 																											else{
 																												int o;
 																											}
-																											glob_var->var_type=curr_st->symbol_tab[i]->var_type;
-																											glob_var->tp_n=curr_st->symbol_tab[i]->tp_n;
-																											if(curr_st->symbol_tab[i]->isInitialized)
+																											glob_var->var_type=currentSymbolTable->symbolTabList[i]->var_type;
+																											glob_var->type=currentSymbolTable->symbolTabList[i]->type;
+																											if(currentSymbolTable->symbolTabList[i]->isInitialized)
 																											{
-																												glob_var->isInitialized=curr_st->symbol_tab[i]->isInitialized;
-																												glob_var->i_val=curr_st->symbol_tab[i]->i_val;
+																												glob_var->isInitialized=currentSymbolTable->symbolTabList[i]->isInitialized;
+																												glob_var->_init_val=currentSymbolTable->symbolTabList[i]->_init_val;
 																											}
 																										}
 																									}
@@ -3058,10 +3083,10 @@ external_declaration:           function_definition                             
 													}                                       ;
 
 function_definition:    declaration_specifiers declarator declaration_list_opt compound_statement {
-																									symdata * func = glob_st->lookup($2.loc->name);
+																									symbol * func = globalSymbolTable->lookup($2.symTPtr->name);
 																									//printf("Hello2\n");
-																									func->nest_tab->symbol_tab[0]->tp_n = CopyType(func->tp_n);
-																									func->nest_tab->symbol_tab[0]->name = "retVal";
+																									func->nested->symbolTabList[0]->type = CopyType(func->type);
+																									func->nested->symbolTabList[0]->name = "retVal";
 																									int l = 0;
 																									int k = 2;
 																									for(int i=0;i<10;++i) {
@@ -3075,15 +3100,15 @@ function_definition:    declaration_specifiers declarator declaration_list_opt c
 																									else{
 																										int o;
 																									}
-																									func->nest_tab->symbol_tab[0]->offset = 0;
+																									func->nested->symbolTabList[0]->offset = 0;
 																									//If return type is pointer then change the offset
-																									if(func->nest_tab->symbol_tab[0]->tp_n->basetp == tp_ptr)
+																									if(func->nested->symbolTabList[0]->type->type == tp_ptr)
 																									{
-																										int diff = size_pointer - func->nest_tab->symbol_tab[0]->size;
-																										func->nest_tab->symbol_tab[0]->size = size_pointer;
-																										for(int i=1;i<func->nest_tab->symbol_tab.size();i++)
+																										int diff = __POINTER_SIZE - func->nested->symbolTabList[0]->width;
+																										func->nested->symbolTabList[0]->width = __POINTER_SIZE;
+																										for(int i=1;i<func->nested->symbolTabList.size();i++)
 																										{
-																											func->nest_tab->symbol_tab[i]->offset += diff;
+																											func->nested->symbolTabList[i]->offset += diff;
 																										}
 																									}
 																									int offset_size = 0;
@@ -3098,13 +3123,13 @@ function_definition:    declaration_specifiers declarator declaration_list_opt c
 																									else{
 																										int o;
 																									}
-																									for(int i=0;i<func->nest_tab->symbol_tab.size();i++)
+																									for(int i=0;i<func->nested->symbolTabList.size();i++)
 																									{
-																										offset_size += func->nest_tab->symbol_tab[i]->size;
+																										offset_size += func->nested->symbolTabList[i]->width;
 																									}
-																									func->nest_tab->end_quad = next_instr-1;
+																									func->nested->lastQuad = nextInstruction-1;
 																									//Create a new Current Symbol Table
-																									curr_st = new symtab();
+																									currentSymbolTable = new symbolTable();
 																								};
 
 declaration_list_opt:           declaration_list                                        |

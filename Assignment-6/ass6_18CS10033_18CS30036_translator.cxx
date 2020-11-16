@@ -1,1123 +1,882 @@
+/*
+####################################
+#### Mukul Mehta | 18CS10033    ####
+#### Rashil Gandhi | 18CS30036  ####
+#### CS39003 -> Compilers Lab   ####
+#### Assignment 6               ####
+####################################
+*/
+
 #include "ass6_18CS10033_18CS30036_translator.h"
+
 #include "y.tab.h"
 
-#define size_int 4
-#define size_double 8
-#define size_char 1
-#define size_bool 1
-#define perc %
-#define pb push_back
-
-int size_pointer = 8;
-
-int rNo1 = 30022;
-symbolType *glob_type;
-int rNo2 = 10038;
-int glob_width;
-
-string name1 = "Kousshik Raj";
-int next_instr;
-string name2 = "Prashant Ramnani";
-
-int temp_count = 0;
+int nextInstruction;
+int TEMP_VAR_COUNT = 0;
 int varCounting = 1;
 
-symtab *glob_st = new symtab();
-symtab *curr_st = new symtab();
-
-quad_arr glob_quad;
+symbolType *globalType;
+symbolTable *globalSymbolTable;
+symbolTable *currentSymbolTable;
+quadArray globalQuadArray;
 vector<string> vs;
-int zero = 0;
 vector<string> cs;
+vector<string> _string_labels;
 
-vector<string> strings_label;
-
-int fact(int n)
-{
-	if (n > 12)
-		return -1;
-
-	else
-	{
-		int i = 1, ans = 1;
-		while (i <= n)
-		{
-			ans *= i;
-			i++;
-		}
-		return ans;
-	}
+symbolType::symbolType(types t, int sz, symbolType *n) {
+    type = t;
+    width = sz;
+    next = n;
 }
 
-symbolType::symbolType(types t, int sz, symbolType *n)
-{
-	basetp = t;
-	size = sz;
-	next = n;
+int symbolType::sizeOfType() {
+    if (this == NULL)
+        return 0;
+
+    if ((this->type) == tp_arr)
+        return ((this->width) * (this->next->sizeOfType()));
+
+    if ((this->type) == tp_void)
+        return __VOID_SIZE;
+
+    if ((this->type) == tp_int)
+        return __INTEGER_SIZE;
+
+    if ((this->type) == tp_bool)
+        return __BOOLEAN_SIZE;
+
+    if ((this->type) == tp_char)
+        return __CHARACTER_SIZE;
+
+    if ((this->type) == tp_ptr)
+        return __POINTER_SIZE;
+
+    return __VOID_SIZE;
 }
 
-bool checkPrime(int n)
-{
-	int ans = 0;
-	for (int i = 2; i <= sqrt(n); i++)
-	{
-		if (n perc i)
-			return false;
-	}
-	return true;
+types symbolType::getBaseType() {
+    if (this == NULL)
+        return tp_void;
+    else
+        return this->type;
 }
 
-int symbolType::getSize()
-{
-	if (this == NULL)
-		return 0;
-	//return the size of the array by calling the recursive function
-	//here we are not checking for null as if it will reach the final type it will enter the below conditions
-	else
-	{
-		int i = 0;
-		while (true)
-		{
-			types variable = this->basetp;
-
-			if (variable == tp_arr)
-				return ((this->size) * (this->next->getSize()));
-
-			else if (variable == tp_void)
-				return zero;
-
-			else if (variable == tp_int)
-				return size_int;
-
-			else if (variable == tp_double)
-				return size_double;
-
-			else if (variable == tp_bool)
-				return size_bool;
-
-			else if (variable == tp_char)
-				return size_char;
-
-			else
-				return size_pointer;
-
-			if (i == -1)
-				break;
-
-			return 0;
-		}
-	}
+void symbolType::printSize() {
+    cout << width << endl;
 }
 
-types symbolType::getBasetp()
-{
-	if (this == NULL)
-		return tp_void;
-	else
-		return this->basetp;
+void symbolType::print() {
+    if (type == tp_void)
+        cout << "VOID ";
+
+    else if (type == tp_bool)
+        cout << "BOOL ";
+
+    else if (type == tp_int)
+        cout << "INT ";
+
+    else if (type == tp_char)
+        cout << "CHAR ";
+
+    else if (type == tp_double)
+        cout << "DOUBLE ";
+
+    else if (type == tp_ptr) {
+        cout << "ptr(";
+        if (this->next != NULL)
+            this->next->print();
+        cout << ")";
+    }
+
+    else if (type == tp_arr) {
+        cout << "array(" << width << ", ";
+        if (this->next != NULL)
+            this->next->print();
+        cout << ")";
+    }
+
+    else if (type == tp_func)
+        cout << "Function()";
+
+    else {
+        cout << "TYPE NOT FOUND" << endl;
+        exit(-1);
+    }
 }
 
-void symbolType::printSize()
-{
-	cout << size << endl;
+symbolTable::symbolTable() {
+    name = "";
+    offset = 0;
+    emptyArgList = 0;
 }
 
-void symbolType::print()
-{
-	if (basetp == tp_void)
-		cout << "Void ";
-
-	else if (basetp == tp_bool)
-		cout << "Bool ";
-
-	else if (basetp == tp_int)
-		cout << "Int ";
-
-	else if (basetp == tp_char)
-		cout << "Char ";
-
-	else if (basetp == tp_double)
-		cout << "Double ";
-
-	else if (basetp == tp_ptr)
-	{
-		cout << "ptr(";
-		if (this->next != NULL)
-			this->next->print();
-		cout << ")";
-	}
-
-	else if (basetp == tp_arr)
-	{
-		cout << "array(" << size;
-		if (this->next != NULL)
-			this->next->print();
-		cout << ")";
-	}
-
-	else if (basetp == tp_func)
-		cout << "Function()";
-
-	else
-	{
-		cout << "TYPE NOT FOUND" << endl;
-		exit(-1);
-	}
+symbolTable::~symbolTable() {
+    int i = 0;
+    for (symbol *var : symbolTabList) {
+        symbolType *pinyin1 = var->type;
+        symbolType *pinyin2;
+        while (pinyin1 != NULL) {
+            pinyin2 = pinyin1;
+            pinyin1 = pinyin1->next;
+            delete pinyin2;
+        }
+    }
 }
 
-bool compo(int n)
-{
-	bool val = checkPrime(n);
-	return !val;
+int symbolTable::findGlobal(string n) {
+    int n1 = vs.size();
+    int n2 = cs.size();
+
+    int i = 0;
+    while (i < n1) {
+        if (vs[i] == n)
+            return 1;
+        i++;
+    }
+
+    int j = 0;
+    while (j < n2) {
+        if (cs[j] == n)
+            return 2;
+        j++;
+    }
+    return 0;
 }
 
-carray::carray(string s, int sz, types t)
-{
-	int two = 2;
-	if (true)
-		this->base_arr = s;
+symbolType *CopyType(symbolType *t) {
+    /*Duplicates the input type and returns the pointer to the newly created type*/
+    if (t != NULL) {
+        symbolType *retinue = new symbolType(t->type);
 
-	if (two == 2)
-		this->tp = t;
+        retinue->width = t->width;
+        retinue->type = t->type;
 
-	this->dimension_size = 1;
-
-	int i = 0;
-	while (i < 2)
-	{
-		this->bsize = sz;
-		i++;
-	}
+        retinue->next = CopyType(t->next);
+        return retinue;
+    } else
+        return t;
 }
 
-void carray::addindex(int i)
-{
-	int j = 0;
-	while (j < 1)
-	{
-		this->dimension_size += 1;
-		this->dims.pb(i);
-		j++;
-	}
+symbol *symbolTable::lookup(string n) {
+    int i = 0;
+    while (i < symbolTabList.size()) {
+        if (symbolTabList[i]->name == n)
+            return symbolTabList[i];
+        i++;
+    }
+
+    int val = 2;
+    for (int i = 0; i < 4; i++) {
+        val /= 2;
+        val *= 3;
+    }
+
+    symbol *temp_o = new symbol(n);
+    temp_o->_init_val._INT_INITVAL = 0;
+    symbolTabList.pb(temp_o);
+    return symbolTabList[symbolTabList.size() - 1];
 }
 
-void funct::print()
-{
+symbol *symbolTable::globalLookup(string n) {
+    int i = 0;
+    while (i < symbolTabList.size()) {
+        if (symbolTabList[i]->name == n)
+            return symbolTabList[i];
+        i++;
+    }
 
-	cout << "Funct(";
-	int i = 0, n = typelist.size();
-	while (i < n)
-	{
-		if (i > 0)
-			cout << " ,";
-		cout << typelist[i];
-		i++;
-	}
-	cout << ")";
+    i = 0;
+    while (i < globalSymbolTable->symbolTabList.size()) {
+        if (globalSymbolTable->symbolTabList[i]->name == n)
+            return globalSymbolTable->symbolTabList[i];
+    }
+
+    symbol *temp_o = new symbol(n);
+    temp_o->_init_val._INT_INITVAL = 0;
+    symbolTabList.pb(temp_o);
+    return symbolTabList[symbolTabList.size() - 1];
 }
 
-funct::funct(vector<types> tpls)
-{
-	vector<types> temp;
-	int n = tpls.size();
-	for (int k = 0; k < n; k++)
-		temp.pb(tpls[k]);
+symbol *symbolTable::search(string n) {
+    int i;
 
-	typelist = temp;
+    for (int i = 0; i < symbolTabList.size(); i++) {
+        symbol *var = symbolTabList[i];
+        if ((var->name == n) && (var->isValid))
+            return var;
+    }
+    return NULL;
 }
 
-symdata::symdata(string n)
-{
-	name = n;
-	//printf("sym%s\n",n.c_str());
-	size = 0;
-	tp_n = NULL;
-	offset = -1, var_type = "", isInitialized = false;
+symbol *symbolTable::gentemp(symbolType *type) {
+    char c[10];
+    sprintf(c, "t%03d", TEMP_VAR_COUNT);
+    TEMP_VAR_COUNT++;
 
-	for (int i = 0; i < 1; i++)
-	{
-		isFunction = false;
-		isArray = false;
-		ispresent = true;
-		arr = NULL;
-		fun = NULL;
-		nest_tab = NULL;
-	}
-	if (true)
-	{
-		isdone = false;
-		isptrarr = false;
-		isGlobal = false;
-	}
+    symbol *temp1 = lookup(c);
+    int temp_sz;
+
+    if (type == NULL)
+        temp_sz = 0;
+    else {
+        switch (type->type) {
+            case tp_void:
+                temp_sz = 0;
+                break;
+            case tp_bool:
+                temp_sz = __BOOLEAN_SIZE;
+                break;
+            case tp_int:
+                temp_sz = __INTEGER_SIZE;
+                break;
+            case tp_char:
+                temp_sz = __CHARACTER_SIZE;
+                break;
+            case tp_double:
+                temp_sz = __DOUBLE_SIZE;
+                break;
+            case tp_ptr:
+                temp_sz = __POINTER_SIZE;
+                break;
+            default:
+                temp_sz = type->sizeOfType();
+                break;
+        }
+    }
+
+    if (true) {
+        temp1->width = temp_sz;
+        temp1->var_type = "temp";
+        temp1->type = type;
+        temp1->offset = this->offset;
+        this->offset = this->offset + (temp1->width);
+
+        return temp1;
+    }
+
+    else
+        return lookup(c);
 }
 
-void symdata::createarray()
-{
-	for (int i = 0; i < 1; i++)
-	{
-		string name1 = this->name;
-		int size1 = this->size;
+void symbolTable::update(symbol *sm, symbolType *type, baseType initval, symbolTable *next) {
+    sm->type = CopyType(type);
+    sm->_init_val = initval;
+    sm->nested = next;
+    int temp_sz;
 
-		arr = new carray(name1, size1, tp_arr);
-	}
+    if (sm->type == NULL)
+        temp_sz = 0;
+    else {
+        switch (type->type) {
+            case tp_void:
+                temp_sz = 0;
+                break;
+            case tp_bool:
+                temp_sz = __BOOLEAN_SIZE;
+                break;
+            case tp_int:
+                temp_sz = __INTEGER_SIZE;
+                break;
+            case tp_char:
+                temp_sz = __CHARACTER_SIZE;
+                break;
+            case tp_double:
+                temp_sz = __DOUBLE_SIZE;
+                break;
+            case tp_ptr:
+                temp_sz = __POINTER_SIZE;
+                break;
+            default:
+                temp_sz = sm->type->sizeOfType();
+                break;
+        }
+    }
+
+    sm->width = temp_sz;
+    sm->offset = this->offset;
+    this->offset = this->offset + (sm->width);
+    sm->isInitialized = false;
 }
 
-symtab::symtab()
-{
-	name = "";
-	offset = zero;
-	no_params = zero;
+void symbolTable::print() {
+    cout << endl;
+    for (int i = 0; i < 85; i++)
+        cout << "+";
+    cout << endl;
+
+    cout << "Symbol Table : " << name << endl;
+
+    printf("Offset = %d\nStart Quad Index = %d\nEnd Quad Index =  %d\n", offset, initQuad, lastQuad);
+    cout << "Name\tValue\tvar_type\tsize\tOffset\tType" << endl;
+
+    int n = symbolTabList.size(), i = 0;
+    while (i < n) {
+        if (symbolTabList[i]->isValid) {
+            symbol *t = symbolTabList[i];
+            cout << symbolTabList[i]->name << "\t";
+            if (!(t->isInitialized))
+                cout << "Null\t";
+            else {
+                types whatEver = (t->type)->type;
+                if (whatEver == tp_char)
+                    printf("%c\t", (t->_init_val)._CHAR_INITVAL);
+                else if (whatEver == tp_int)
+                    printf("%d\t", (t->_init_val)._INT_INITVAL);
+                else if (whatEver == tp_double)
+                    printf("%.3lf\t", (t->_init_val)._DOUBLE_INITVAL);
+                else {
+                    int j = 0;
+                    while (j < 5) {
+                        cout << "-";
+                        j++;
+                    }
+                    cout << endl;
+                }
+            }
+            cout << t->var_type;
+
+            printf("\t\t%d\t%d\t", t->width, t->offset);
+
+            if (t->var_type == "func")
+                printf("ptr-to-St( %s )", t->nested->name.c_str());
+
+            if (t->type != NULL)
+                (t->type)->print();
+
+            cout << endl;
+        }
+        i++;
+    }
+
+    cout << endl;
+    for (int i = 0; i < 85; i++)
+        cout << "+";
+    cout << endl;
 }
 
-symtab::~symtab()
-{
-	int i = zero;
-	for (symdata *var : symbol_tab)
-	{
-		symbolType *pinyin1 = var->tp_n;
-		symbolType *pinyin2;
-		while (pinyin1 != NULL)
-		{
-			pinyin2 = pinyin1;
-			pinyin1 = pinyin1->next;
-			delete pinyin2;
-		}
-	}
+_array::_array(string s, int sz, types t) {
+    int two = 2;
+    if (true)
+        this->array = s;
+
+    if (two == 2)
+        this->tp = t;
+
+    this->ndims = 1;
+
+    int i = 0;
+    while (i < 2) {
+        this->bsize = sz;
+        i++;
+    }
 }
 
-int symtab::findg(string n)
-{
-	for (int i = 0; i < 10; i++)
-		;
-
-	int n1 = vs.size();
-	int n2 = cs.size();
-
-	int i = 0;
-	while (i < n1)
-	{
-		if (vs[i] == n)
-			return 1;
-		i++;
-	}
-
-	i = 0;
-	while (i < n2)
-	{
-		if (cs[i] == n)
-			return 2;
-		i++;
-	}
-	return 0;
+void _array::_arrayIndex(int i) {
+    int j = 0;
+    while (j < 1) {
+        this->ndims += 1;
+        this->dims.pb(i);
+        j++;
+    }
 }
 
-symbolType *CopyType(symbolType *t)
-{
-	/*Duplicates the input type and returns the pointer to the newly created type*/
-	if (t != NULL)
-	{
-		symbolType *retinue = new symbolType(t->basetp);
+symbol::symbol(string n) {
+    name = n;
+    width = 0;
+    type = NULL;
+    offset = -1, var_type = "", isInitialized = false;
 
-		retinue->size = t->size;
-		retinue->basetp = t->basetp;
-
-		retinue->next = CopyType(t->next);
-		return retinue;
-	}
-	else
-		return t;
+    isFunction = false;
+    isArray = false;
+    isValid = true;
+    arr = NULL;
+    nested = NULL;
+    isMarked = false;
+    isPointerArray = false;
+    isGlobal = false;
 }
 
-symdata *symtab::lookup(string n)
-{
-	int i = 0;
-	while (i < symbol_tab.size())
-	{
-		if (symbol_tab[i]->name == n)
-			return symbol_tab[i];
-		i++;
-	}
+void symbol::getNewArray() {
+    for (int i = 0; i < 1; i++) {
+        string name1 = this->name;
+        int size1 = this->width;
 
-	int val = 2;
-	for (int i = 0; i < 4; i++)
-	{
-		val /= 2;
-		val *= 3;
-	}
-
-	symdata *temp_o = new symdata(n);
-	temp_o->i_val.int_val = 0;
-	symbol_tab.pb(temp_o);
-	return symbol_tab[symbol_tab.size() - 1];
+        arr = new _array(name1, size1, tp_arr);
+    }
 }
 
-symdata *symtab::lookup_2(string n)
-{
-	int i = 0;
-	while (i < symbol_tab.size())
-	{
-		if (symbol_tab[i]->name == n)
-			return symbol_tab[i];
-		i++;
-	}
+list *makelist(int i) {
+    list *temp = (list *)malloc(sizeof(list));
 
-	i = 0;
-	while (i < glob_st->symbol_tab.size())
-	{
-		if (glob_st->symbol_tab[i]->name == n)
-			return glob_st->symbol_tab[i];
-	}
+    temp->index = i;
+    temp->next = NULL;
 
-	symdata *temp_o = new symdata(n);
-	temp_o->i_val.int_val = 0;
-	symbol_tab.pb(temp_o);
-	return symbol_tab[symbol_tab.size() - 1];
+    if (true)
+        return temp;
+    else
+        return temp;
 }
 
-symdata *symtab::search(string n)
-{
-	int i;
-
-	for (int i = 0; i < symbol_tab.size(); i++)
-	{
-		symdata *var = symbol_tab[i];
-		if ((var->name == n) && (var->ispresent))
-			return var;
-	}
-	return NULL;
+list *merge(list *lt1, list *lt2) {
+    list *temp = (list *)malloc(sizeof(list));
+    list *pinyin1 = temp;
+    int flag = 0;
+    list *linyin = lt1;
+    list *linyin2 = lt2;
+    while (linyin != NULL) {
+        flag = 1;
+        pinyin1->index = linyin->index;
+        if (linyin->next != NULL) {
+            pinyin1->next = (list *)malloc(sizeof(list));
+            pinyin1 = pinyin1->next;
+        }
+        linyin = linyin->next;
+    }
+    while (linyin2 != NULL) {
+        if (flag == 1) {
+            pinyin1->next = (list *)malloc(sizeof(list));
+            pinyin1 = pinyin1->next;
+            flag = 0;
+        }
+        pinyin1->index = linyin2->index;
+        if (linyin2->next != NULL) {
+            pinyin1->next = (list *)malloc(sizeof(list));
+            pinyin1 = pinyin1->next;
+        }
+        linyin2 = linyin2->next;
+    }
+    pinyin1->next = NULL;
+    return temp;
 }
 
-symdata *symtab::gentemp(symbolType *type)
-{
-	char c[10];
-	sprintf(c, "t%03d", temp_count);
-	temp_count++;
+quad::quad(opcode operation, string _arg1, string _arg2, string _result) : result(_result), arg1(_arg1), arg2(_arg2), op(operation){};
 
-	symdata *temp1 = lookup(c);
-	int temp_sz;
-
-	if (type == NULL)
-		temp_sz = 0;
-	else
-	{
-		switch (type->basetp)
-		{
-		case tp_void:
-			temp_sz = 0;
-			break;
-		case tp_bool:
-			temp_sz = size_bool;
-			break;
-		case tp_int:
-			temp_sz = size_int;
-			break;
-		case tp_char:
-			temp_sz = size_char;
-			break;
-		case tp_double:
-			temp_sz = size_double;
-			break;
-		case tp_ptr:
-			temp_sz = size_pointer;
-			break;
-		default:
-			temp_sz = type->getSize();
-			break;
-		}
-	}
-
-	if (true)
-	{
-		temp1->size = temp_sz;
-		temp1->var_type = "temp";
-		temp1->tp_n = type;
-		temp1->offset = this->offset;
-		this->offset = this->offset + (temp1->size);
-
-		return temp1;
-	}
-
-	else
-		return lookup(c);
+void quad::print() {
+    cout << "\t" << result << "\t=\t" << arg1 << "\top\t" << arg2 << "\t";
 }
 
-void symtab::update(symdata *sm, symbolType *type, basic_val initval, symtab *next)
-{
-	sm->tp_n = CopyType(type);
-	sm->i_val = initval;
-	sm->nest_tab = next;
-	int temp_sz;
-
-	if (sm->tp_n == NULL)
-		temp_sz = 0;
-	else
-	{
-		switch (type->basetp)
-		{
-		case tp_void:
-			temp_sz = 0;
-			break;
-		case tp_bool:
-			temp_sz = size_bool;
-			break;
-		case tp_int:
-			temp_sz = size_int;
-			break;
-		case tp_char:
-			temp_sz = size_char;
-			break;
-		case tp_double:
-			temp_sz = size_double;
-			break;
-		case tp_ptr:
-			temp_sz = size_pointer;
-			break;
-		default:
-			temp_sz = sm->tp_n->getSize();
-			break;
-		}
-	}
-
-	sm->size = temp_sz;
-	sm->offset = this->offset;
-	this->offset = this->offset + (sm->size);
-	sm->isInitialized = false;
+quadArray::quadArray() {
+    nextInstruction = 0;
 }
 
-void symtab::print()
-{
-	cout << endl;
-	for (int i = 0; i < 85; i++)
-		cout << "+";
-	cout << endl;
-
-	cout << "Symbol Table : " << name << endl;
-
-	printf("Offset = %d\nStart Quad Index = %d\nEnd Quad Index =  %d\n", offset, start_quad, end_quad);
-	cout << "Name\tValue\tvar_type\tsize\tOffset\tType" << endl;
-
-	int n = symbol_tab.size(), i = 0;
-	while (i < n)
-	{
-		if (symbol_tab[i]->ispresent)
-		{
-			symdata *t = symbol_tab[i];
-			cout << symbol_tab[i]->name << "\t";
-			if (!(t->isInitialized))
-				cout << "Null\t";
-			else
-			{
-				types whatEver = (t->tp_n)->basetp;
-				if (whatEver == tp_char)
-					printf("%c\t", (t->i_val).char_val);
-				else if (whatEver == tp_int)
-					printf("%d\t", (t->i_val).int_val);
-				else if (whatEver == tp_double)
-					printf("%.3lf\t", (t->i_val).double_val);
-				else
-				{
-					int j = 0;
-					while (j < 5)
-					{
-						cout << "-";
-						j++;
-					}
-					cout << endl;
-				}
-			}
-			cout << t->var_type;
-
-			printf("\t\t%d\t%d\t", t->size, t->offset);
-
-			if (t->var_type == "func")
-				printf("ptr-to-St( %s )", t->nest_tab->name.c_str());
-
-			if (t->tp_n != NULL)
-				(t->tp_n)->print();
-
-			cout << endl;
-		}
-		i++;
-	}
-
-	cout << endl;
-	for (int i = 0; i < 85; i++)
-		cout << "+";
-	cout << endl;
+void quadArray::emit(opcode opc, string arg1, string arg2, string result) {
+    if (result.size() != 0) {
+        quad new_elem(opc, arg1, arg2, result);
+        quads.pb(new_elem);
+    } else if (arg2.size() != 0) {
+        quad new_elem(opc, arg1, "", arg2);
+        quads.pb(new_elem);
+    } else if (arg1.size() != 0) {
+        quad new_elem(opc, "", "", arg1);
+        quads.pb(new_elem);
+    } else {
+        quad new_elem(opc, "", "", "");
+        quads.pb(new_elem);
+    }
+    nextInstruction = nextInstruction + 1;
 }
 
-list *makelist(int i)
-{
-	list *temp = (list *)malloc(sizeof(list));
-
-	temp->index = i;
-	temp->next = NULL;
-
-	if (true)
-		return temp;
-	else
-		return temp;
+void quadArray::emitG(opcode opc, string arg1, string arg2, string result) {
+    if (result.size() == 0) {
+        quad new_elem(opc, arg1, arg2, "");
+        quads.pb(new_elem);
+    }
+}
+void quadArray::emit(opcode opc, int val, string operand) {
+    char str[20];
+    sprintf(str, "%d", val);
+    int j = 0;
+    while (j < 1) {
+        if (operand.size() == 0) {
+            quad new_quad(opc, "", "", str);
+            quads.pb(new_quad);
+        } else {
+            quad new_quad(opc, str, "", operand);
+            quads.pb(new_quad);
+        }
+        j++;
+    }
+    nextInstruction += 1;
+}
+void quadArray::emit(opcode opc, double val, string operand) {
+    char str[20];
+    sprintf(str, "%lf", val);
+    for (int i = 0; i < 1; i++) {
+        if (operand.size() == 0) {
+            quad new_quad(opc, "", "", str);
+            quads.pb(new_quad);
+        } else {
+            quad new_quad(opc, str, "", operand);
+            quads.pb(new_quad);
+        }
+    }
+    nextInstruction += 1;
+}
+void quadArray::emit(opcode opc, char val, string operand) {
+    char str[20];
+    sprintf(str, "'%c'", val);
+    if (operand.size() == 0) {
+        quad new_quad(opc, "", "", str);
+        quads.pb(new_quad);
+    } else {
+        quad new_quad(opc, str, "", operand);
+        quads.pb(new_quad);
+    }
+    nextInstruction = nextInstruction + 1;
 }
 
-list *merge(list *lt1, list *lt2)
-{
-	list *temp = (list *)malloc(sizeof(list));
-	list *pinyin1 = temp;
-	int flag = 0;
-	list *linyin = lt1;
-	list *linyin2 = lt2;
-	while (linyin != NULL)
-	{
-		flag = 1;
-		pinyin1->index = linyin->index;
-		if (linyin->next != NULL)
-		{
-			pinyin1->next = (list *)malloc(sizeof(list));
-			pinyin1 = pinyin1->next;
-		}
-		linyin = linyin->next;
-	}
-	while (linyin2 != NULL)
-	{
-		if (flag == 1)
-		{
-			pinyin1->next = (list *)malloc(sizeof(list));
-			pinyin1 = pinyin1->next;
-			flag = 0;
-		}
-		pinyin1->index = linyin2->index;
-		if (linyin2->next != NULL)
-		{
-			pinyin1->next = (list *)malloc(sizeof(list));
-			pinyin1 = pinyin1->next;
-		}
-		linyin2 = linyin2->next;
-	}
-	pinyin1->next = NULL;
-	return temp;
+void quadArray::print() {
+    opcode op;
+    string arg1;
+    string arg2;
+    string result;
+    for (int i = 0; i < nextInstruction; i++) {
+        op = quads[i].op;
+        arg1 = quads[i].arg1;
+        arg2 = quads[i].arg2;
+        result = quads[i].result;
+        printf("%3d. :", i);
+        if (Q_PLUS <= op && op <= Q_NOT_EQUAL) {
+            cout << result << "\t=\t" << arg1 << " ";
+
+            switch (op) {
+                case Q_PLUS:
+                    cout << "+";
+                    break;
+                case Q_MINUS:
+                    cout << "-";
+                    break;
+                case Q_MULT:
+                    cout << "*";
+                    break;
+                case Q_DIVIDE:
+                    cout << "/";
+                    break;
+                case Q_MODULO:
+                    cout << "%%";
+                    break;
+                case Q_LEFT_OP:
+                    cout << "<<";
+                    break;
+                case Q_RIGHT_OP:
+                    cout << ">>";
+                    break;
+                case Q_XOR:
+                    cout << "^";
+                    break;
+                case Q_AND:
+                    cout << "&";
+                    break;
+                case Q_OR:
+                    cout << "|";
+                    break;
+                case Q_LOG_AND:
+                    cout << "&&";
+                    break;
+                case Q_LOG_OR:
+                    cout << "||";
+                    break;
+                case Q_LESS:
+                    cout << "<";
+                    break;
+                case Q_LESS_OR_EQUAL:
+                    cout << "<=";
+                    break;
+                case Q_GREATER_OR_EQUAL:
+                    cout << ">=";
+                    break;
+                case Q_GREATER:
+                    cout << ">";
+                    break;
+                case Q_EQUAL:
+                    cout << "==";
+                    break;
+                case Q_NOT_EQUAL:
+                    cout << "!=";
+                    break;
+            }
+            cout << " " << arg2 << endl;
+        }
+
+        else if (Q_UNARY_MINUS <= op && op <= Q_ASSIGN) {
+            cout << result << "\t=\t" << arg1 << " ";
+
+            switch (op) {
+                //Unary Assignment Instruction
+                case Q_UNARY_MINUS:
+                    cout << "-";
+                    break;
+                case Q_UNARY_PLUS:
+                    cout << "+";
+                    break;
+                case Q_COMPLEMENT:
+                    cout << "~";
+                    break;
+                case Q_NOT:
+                    cout << "!";
+                    break;
+                //Copy Assignment Instruction
+                case Q_ASSIGN:
+                    break;
+            }
+            cout << arg1 << endl;
+        }
+
+        else if (op == Q_GOTO)
+            cout << "goto " << result << endl;
+
+        else if (Q_IF_EQUAL <= op && op <= Q_IF_GREATER_OR_EQUAL) {
+            cout << "if  " << arg1 << " ";
+
+            switch (op) {
+                //Conditional Jump
+                case Q_IF_LESS:
+                    cout << "<";
+                    break;
+                case Q_IF_GREATER:
+                    cout << ">";
+                    break;
+                case Q_IF_LESS_OR_EQUAL:
+                    cout << "<=";
+                    break;
+                case Q_IF_GREATER_OR_EQUAL:
+                    cout << ">=";
+                    break;
+                case Q_IF_EQUAL:
+                    cout << "==";
+                    break;
+                case Q_IF_NOT_EQUAL:
+                    cout << "!=";
+                    break;
+                case Q_IF_EXPRESSION:
+                    cout << "!= 0";
+                    break;
+                case Q_IF_NOT_EXPRESSION:
+                    cout << "== 0";
+                    break;
+            }
+            cout << arg2 << "\tgoto  " << result << endl;
+        }
+
+        else if (Q_CHAR2INT <= op && op <= Q_DOUBLE2INT) {
+            cout << result << "\t=\t";
+            switch (op) {
+                case Q_CHAR2INT:
+                    printf(" Char2Int(");
+                    printf("%s", arg1.c_str());
+                    printf(")\n");
+                    break;
+                case Q_CHAR2DOUBLE:
+                    printf(" Char2Double(");
+                    printf("%s", arg1.c_str());
+                    printf(")\n");
+                    break;
+                case Q_INT2CHAR:
+                    printf(" Int2Char(");
+                    printf("%s", arg1.c_str());
+                    printf(")\n");
+                    break;
+                case Q_DOUBLE2CHAR:
+                    printf(" Double2Char(");
+                    printf("%s", arg1.c_str());
+                    printf(")\n");
+                    break;
+                case Q_INT2DOUBLE:
+                    printf(" Int2Double(");
+                    printf("%s", arg1.c_str());
+                    printf(")\n");
+                    break;
+                case Q_DOUBLE2INT:
+                    printf(" Double2Int(");
+                    printf("%s", arg1.c_str());
+                    printf(")\n");
+                    break;
+            }
+        } else if (op == Q_PARAM) {
+            printf("param\t");
+            printf("%s\n", result.c_str());
+        } else if (op == Q_CALL) {
+            if (!result.c_str())
+                printf("call %s, %s\n", arg1.c_str(), arg2.c_str());
+            else if (result.size() == 0) {
+                printf("call %s, %s\n", arg1.c_str(), arg2.c_str());
+            } else
+                printf("%s\t=\tcall %s, %s\n", result.c_str(), arg1.c_str(), arg2.c_str());
+        } else if (op == Q_RETURN) {
+            printf("return\t");
+            printf("%s\n", result.c_str());
+        } else if (op == Q_RINDEX) {
+            printf("%s\t=\t%s[%s]\n", result.c_str(), arg1.c_str(), arg2.c_str());
+        } else if (op == Q_LINDEX) {
+            printf("%s[%s]\t=\t%s\n", result.c_str(), arg1.c_str(), arg2.c_str());
+        } else if (op == Q_LDEREF) {
+            printf("*%s\t=\t%s\n", result.c_str(), arg1.c_str());
+        } else if (op == Q_RDEREF) {
+            printf("%s\t=\t* %s\n", result.c_str(), arg1.c_str());
+        } else if (op == Q_ADDR) {
+            printf("%s\t=\t& %s\n", result.c_str(), arg1.c_str());
+        }
+    }
 }
 
-quad::quad(opcode opc, string a1, string a2, string rs)
-{
-	if (true)
-	{
-		this->op = opc;
-		this->arg1 = a1;
-	}
-	if (zero == 0)
-	{
-		this->result = rs;
-		this->arg2 = a2;
-	}
-	else
-		zero = 2 - 2;
+void backpatch(list *l, int i) {
+    list *temp = l;
+    list *temp2;
+    char str[10];
+    sprintf(str, "%d", i);
+    while (temp != NULL) {
+        globalQuadArray.quads[temp->index].result = str;
+        temp2 = temp;
+        temp = temp->next;
+        free(temp2);
+    }
 }
 
-void quad::print_arg()
-{
-	cout << "\t" << result << "\t=\t" << arg1 << "\top\t" << arg2 << "\t";
+void typecheck(expression *e1, expression *e2, bool isAssign) {
+    types type1, type2;
+    //if(e2->type)
+    if (e1->type == NULL) {
+        e1->type = CopyType(e2->type);
+    } else if (e2->type == NULL) {
+        e2->type = CopyType(e1->type);
+    }
+    type1 = (e1->type)->type;
+    type2 = (e2->type)->type;
+    if (type1 == type2) {
+        return;
+    }
+    if (!isAssign) {
+        if (type1 > type2) {
+            symbol *temp = currentSymbolTable->gentemp(e1->type);
+            if (type1 == tp_int && type2 == tp_char)
+                globalQuadArray.emit(Q_CHAR2INT, e2->symTPtr->name, temp->name);
+            else if (type1 == tp_double && type2 == tp_int)
+                globalQuadArray.emit(Q_INT2DOUBLE, e2->symTPtr->name, temp->name);
+            e2->symTPtr = temp;
+            e2->type = temp->type;
+        } else {
+            symbol *temp = currentSymbolTable->gentemp(e2->type);
+            if (type2 == tp_int && type1 == tp_char)
+                globalQuadArray.emit(Q_CHAR2INT, e1->symTPtr->name, temp->name);
+            else if (type2 == tp_double && type1 == tp_int)
+                globalQuadArray.emit(Q_INT2DOUBLE, e1->symTPtr->name, temp->name);
+            e1->symTPtr = temp;
+            e1->type = temp->type;
+        }
+    } else {
+        symbol *temp = currentSymbolTable->gentemp(e1->type);
+        if (type1 == tp_int && type2 == tp_double)
+            globalQuadArray.emit(Q_DOUBLE2INT, e2->symTPtr->name, temp->name);
+        else if (type1 == tp_double && type2 == tp_int)
+            globalQuadArray.emit(Q_INT2DOUBLE, e2->symTPtr->name, temp->name);
+        else if (type1 == tp_char && type2 == tp_int)
+            globalQuadArray.emit(Q_INT2CHAR, e2->symTPtr->name, temp->name);
+        else if (type1 == tp_int && type2 == tp_char)
+            globalQuadArray.emit(Q_CHAR2INT, e2->symTPtr->name, temp->name);
+        else {
+            printf("%s %s Types compatibility not defined\n", e1->symTPtr->name.c_str(), e2->symTPtr->name.c_str());
+            exit(-1);
+        }
+        e2->symTPtr = temp;
+        e2->type = temp->type;
+    }
 }
 
-quad_arr::quad_arr()
-{
-	next_instr = 0;
+void printList(list *root) {
+    int flag = 0;
+    while (root != NULL) {
+        printf("%d ", root->index);
+        flag = 1;
+        root = root->next;
+    }
+    if (flag == 0) {
+        printf("Empty List\n");
+    } else {
+        printf("\n");
+    }
 }
 
-void quad_arr::emit(opcode opc, string arg1, string arg2, string result)
-{
-	if (result.size() != 0)
-	{
-		quad new_elem(opc, arg1, arg2, result);
-		arr.pb(new_elem);
-	}
-	else if (arg2.size() != 0)
-	{
-		quad new_elem(opc, arg1, "", arg2);
-		arr.pb(new_elem);
-	}
-	else if (arg1.size() != 0)
-	{
-		quad new_elem(opc, "", "", arg1);
-		arr.pb(new_elem);
-	}
-	else
-	{
-		quad new_elem(opc, "", "", "");
-		arr.pb(new_elem);
-	}
-	next_instr = next_instr + 1;
+void CONV2BOOL(expression *e) {
+    if ((e->type)->type != tp_bool) {
+        (e->type) = new symbolType(tp_bool);
+        e->falselist = makelist(nextInstruction);
+        globalQuadArray.emit(Q_IF_EQUAL, e->symTPtr->name, "0", "-1");
+        e->truelist = makelist(nextInstruction);
+        globalQuadArray.emit(Q_GOTO, -1);
+    }
 }
 
-void quad_arr::emit2(opcode opc, string arg1, string arg2, string result)
-{
-	if (result.size() == 0)
-	{
-		quad new_elem(opc, arg1, arg2, "");
-		arr.pb(new_elem);
-	}
-}
-void quad_arr::emit(opcode opc, int val, string operand)
-{
-	char str[20];
-	sprintf(str, "%d", val);
-	int j = 0;
-	while (j < 1)
-	{
-		if (operand.size() == 0)
-		{
-			quad new_quad(opc, "", "", str);
-			arr.pb(new_quad);
-		}
-		else
-		{
-			quad new_quad(opc, str, "", operand);
-			arr.pb(new_quad);
-		}
-		j++;
-	}
-	next_instr += 1;
-}
+int main() {
+    globalSymbolTable = new symbolTable();
+    currentSymbolTable = new symbolTable();
 
-void quad_arr::emit(opcode opc, double val, string operand)
-{
-	char str[20];
-	sprintf(str, "%lf", val);
-	for (int i = 0; i < 1; i++)
-	{
-		if (operand.size() == 0)
-		{
-			quad new_quad(opc, "", "", str);
-			arr.pb(new_quad);
-		}
-		else
-		{
-			quad new_quad(opc, str, "", operand);
-			arr.pb(new_quad);
-		}
-	}
-	next_instr += 1;
-}
+    globalSymbolTable->name = "Global";
 
-void quad_arr::emit(opcode opc, char val, string operand)
-{
-	char str[20];
-	sprintf(str, "'%c'", val);
-	if (operand.size() == 0)
-	{
-		quad new_quad(opc, "", "", str);
-		arr.pb(new_quad);
-	}
-	else
-	{
-		quad new_quad(opc, str, "", operand);
-		arr.pb(new_quad);
-	}
-	next_instr = next_instr + 1;
-}
+    /*
+        Add library functions to symbol table to initialize
+    */
+    symbol *printStr = new symbol("printStr");
+    printStr->type = new symbolType(tp_int);
+    printStr->var_type = "func";
+    printStr->nested = globalSymbolTable;
 
-void quad_arr::print()
-{
-	opcode op;
-	string arg1;
-	string arg2;
-	string result;
-	for (int i = 0; i < next_instr; i++)
-	{
+    symbol *printInt = new symbol("printInt");
+    printInt->type = new symbolType(tp_int);
+    printInt->var_type = "func";
+    printInt->nested = globalSymbolTable;
 
-		op = arr[i].op;
-		arg1 = arr[i].arg1;
-		arg2 = arr[i].arg2;
-		result = arr[i].result;
-		printf("%3d. :", i);
-		if (Q_PLUS <= op && op <= Q_NOT_EQUAL)
-		{
-			cout << result << "\t=\t" << arg1 << " ";
+    symbol *readInt = new symbol("readInt");
+    readInt->type = new symbolType(tp_int);
+    readInt->var_type = "func";
+    readInt->nested = globalSymbolTable;
 
-			switch (op)
-			{
-			case Q_PLUS:
-				cout << "+";
-				break;
-			case Q_MINUS:
-				cout << "-";
-				break;
-			case Q_MULT:
-				cout << "*";
-				break;
-			case Q_DIVIDE:
-				cout << "/";
-				break;
-			case Q_MODULO:
-				cout << "%%";
-				break;
-			case Q_LEFT_OP:
-				cout << "<<";
-				break;
-			case Q_RIGHT_OP:
-				cout << ">>";
-				break;
-			case Q_XOR:
-				cout << "^";
-				break;
-			case Q_AND:
-				cout << "&";
-				break;
-			case Q_OR:
-				cout << "|";
-				break;
-			case Q_LOG_AND:
-				cout << "&&";
-				break;
-			case Q_LOG_OR:
-				cout << "||";
-				break;
-			case Q_LESS:
-				cout << "<";
-				break;
-			case Q_LESS_OR_EQUAL:
-				cout << "<=";
-				break;
-			case Q_GREATER_OR_EQUAL:
-				cout << ">=";
-				break;
-			case Q_GREATER:
-				cout << ">";
-				break;
-			case Q_EQUAL:
-				cout << "==";
-				break;
-			case Q_NOT_EQUAL:
-				cout << "!=";
-				break;
-			}
-			cout << " " << arg2 << endl;
-		}
+    globalSymbolTable->symbolTabList.pb(printStr);
+    globalSymbolTable->symbolTabList.pb(printInt);
+    globalSymbolTable->symbolTabList.pb(readInt);
 
-		else if (Q_UNARY_MINUS <= op && op <= Q_ASSIGN)
-		{
-			cout << result << "\t=\t" << arg1 << " ";
+    yyparse();
 
-			switch (op)
-			{
+    cout << "========================================================================================================================\n";
+    cout << "|\t\tTAC Translation\t\t|" << endl;
+    globalQuadArray.print();
+    cout << "========================================================================================================================" << endl;
+    cout << "\n"
+         << endl;
 
-			//Unary Assignment Instruction
-			case Q_UNARY_MINUS:
-				cout << "-";
-				break;
-			case Q_UNARY_PLUS:
-				cout << "+";
-				break;
-			case Q_COMPLEMENT:
-				cout << "~";
-				break;
-			case Q_NOT:
-				cout << "!";
-				break;
-			//Copy Assignment Instruction
-			case Q_ASSIGN:
-				break;
-			}
-			cout << arg1 << endl;
-		}
+    cout << "========================================================================================================================" << endl;
+    cout << "|\t\tSymbol Tables\t\t|" << endl;
+    globalSymbolTable->print();
 
-		else if (op == Q_GOTO)
-			cout << "goto " << result << endl;
+    cout << "========================================================================================================================" << endl;
 
-		else if (Q_IF_EQUAL <= op && op <= Q_IF_GREATER_OR_EQUAL)
-		{
-			cout << "if  " << arg1 << " ";
+    FILE *fp;
+    fp = fopen("output.s", "w");
+    fprintf(fp, "# Compiled by Mukul and Rashil on GNU / Linux with Love\n");
+    fprintf(fp, "# Free Software, Free Society\n");
+    fprintf(fp, "\t.file\t\"output.s\"\n");
+    for (int i = 0; i < _string_labels.size(); ++i) {
+        fprintf(fp, "\n.STR%d:\t.string %s", i, _string_labels[i].c_str());
+    }
+    set<string> labelSet;
+    globalSymbolTable->mark_labels();
+    globalSymbolTable->globalVar(fp);
+    labelSet.insert("Global");
 
-			switch (op)
-			{
-			//Conditional Jump
-			case Q_IF_LESS:
-				cout << "<";
-				break;
-			case Q_IF_GREATER:
-				cout << ">";
-				break;
-			case Q_IF_LESS_OR_EQUAL:
-				cout << "<=";
-				break;
-			case Q_IF_GREATER_OR_EQUAL:
-				cout << ">=";
-				break;
-			case Q_IF_EQUAL:
-				cout << "==";
-				break;
-			case Q_IF_NOT_EQUAL:
-				cout << "!=";
-				break;
-			case Q_IF_EXPRESSION:
-				cout << "!= 0";
-				break;
-			case Q_IF_NOT_EXPRESSION:
-				cout << "== 0";
-				break;
-			}
-			cout << arg2 << "\tgoto  " << result << endl;
-		}
-
-		else if (Q_CHAR2INT <= op && op <= Q_DOUBLE2INT)
-		{
-			cout << result << "\t=\t";
-			switch (op)
-			{
-			case Q_CHAR2INT:
-				printf(" Char2Int(");
-				printf("%s", arg1.c_str());
-				printf(")\n");
-				break;
-			case Q_CHAR2DOUBLE:
-				printf(" Char2Double(");
-				printf("%s", arg1.c_str());
-				printf(")\n");
-				break;
-			case Q_INT2CHAR:
-				printf(" Int2Char(");
-				printf("%s", arg1.c_str());
-				printf(")\n");
-				break;
-			case Q_DOUBLE2CHAR:
-				printf(" Double2Char(");
-				printf("%s", arg1.c_str());
-				printf(")\n");
-				break;
-			case Q_INT2DOUBLE:
-				printf(" Int2Double(");
-				printf("%s", arg1.c_str());
-				printf(")\n");
-				break;
-			case Q_DOUBLE2INT:
-				printf(" Double2Int(");
-				printf("%s", arg1.c_str());
-				printf(")\n");
-				break;
-			}
-		}
-		else if (op == Q_PARAM)
-		{
-			printf("param\t");
-			printf("%s\n", result.c_str());
-		}
-		else if (op == Q_CALL)
-		{
-			if (!result.c_str())
-				printf("call %s, %s\n", arg1.c_str(), arg2.c_str());
-			else if (result.size() == 0)
-			{
-				printf("call %s, %s\n", arg1.c_str(), arg2.c_str());
-			}
-			else
-				printf("%s\t=\tcall %s, %s\n", result.c_str(), arg1.c_str(), arg2.c_str());
-		}
-		else if (op == Q_RETURN)
-		{
-			printf("return\t");
-			printf("%s\n", result.c_str());
-		}
-		else if (op == Q_RINDEX)
-		{
-			printf("%s\t=\t%s[%s]\n", result.c_str(), arg1.c_str(), arg2.c_str());
-		}
-		else if (op == Q_LINDEX)
-		{
-			printf("%s[%s]\t=\t%s\n", result.c_str(), arg1.c_str(), arg2.c_str());
-		}
-		else if (op == Q_LDEREF)
-		{
-			printf("*%s\t=\t%s\n", result.c_str(), arg1.c_str());
-		}
-		else if (op == Q_RDEREF)
-		{
-			printf("%s\t=\t* %s\n", result.c_str(), arg1.c_str());
-		}
-		else if (op == Q_ADDR)
-		{
-			printf("%s\t=\t& %s\n", result.c_str(), arg1.c_str());
-		}
-	}
-}
-
-void backpatch(list *l, int i)
-{
-	list *temp = l;
-	list *temp2;
-	char str[10];
-	sprintf(str, "%d", i);
-	while (temp != NULL)
-	{
-		glob_quad.arr[temp->index].result = str;
-		temp2 = temp;
-		temp = temp->next;
-		free(temp2);
-	}
-}
-
-void typecheck(expression *e1, expression *e2, bool isAssign)
-{
-	types type1, type2;
-	//if(e2->type)
-	if (e1->type == NULL)
-	{
-		e1->type = CopyType(e2->type);
-	}
-	else if (e2->type == NULL)
-	{
-		e2->type = CopyType(e1->type);
-	}
-	type1 = (e1->type)->basetp;
-	type2 = (e2->type)->basetp;
-	if (type1 == type2)
-	{
-		return;
-	}
-	if (!isAssign)
-	{
-		if (type1 > type2)
-		{
-			symdata *temp = curr_st->gentemp(e1->type);
-			if (type1 == tp_int && type2 == tp_char)
-				glob_quad.emit(Q_CHAR2INT, e2->loc->name, temp->name);
-			else if (type1 == tp_double && type2 == tp_int)
-				glob_quad.emit(Q_INT2DOUBLE, e2->loc->name, temp->name);
-			e2->loc = temp;
-			e2->type = temp->tp_n;
-		}
-		else
-		{
-			symdata *temp = curr_st->gentemp(e2->type);
-			if (type2 == tp_int && type1 == tp_char)
-				glob_quad.emit(Q_CHAR2INT, e1->loc->name, temp->name);
-			else if (type2 == tp_double && type1 == tp_int)
-				glob_quad.emit(Q_INT2DOUBLE, e1->loc->name, temp->name);
-			e1->loc = temp;
-			e1->type = temp->tp_n;
-		}
-	}
-	else
-	{
-		symdata *temp = curr_st->gentemp(e1->type);
-		if (type1 == tp_int && type2 == tp_double)
-			glob_quad.emit(Q_DOUBLE2INT, e2->loc->name, temp->name);
-		else if (type1 == tp_double && type2 == tp_int)
-			glob_quad.emit(Q_INT2DOUBLE, e2->loc->name, temp->name);
-		else if (type1 == tp_char && type2 == tp_int)
-			glob_quad.emit(Q_INT2CHAR, e2->loc->name, temp->name);
-		else if (type1 == tp_int && type2 == tp_char)
-			glob_quad.emit(Q_CHAR2INT, e2->loc->name, temp->name);
-		else
-		{
-			printf("%s %s Types compatibility not defined\n", e1->loc->name.c_str(), e2->loc->name.c_str());
-			exit(-1);
-		}
-		e2->loc = temp;
-		e2->type = temp->tp_n;
-	}
-}
-
-void print_list(list *root)
-{
-	int flag = 0;
-	while (root != NULL)
-	{
-		printf("%d ", root->index);
-		flag = 1;
-		root = root->next;
-	}
-	if (flag == 0)
-	{
-		printf("Empty List\n");
-	}
-	else
-	{
-		printf("\n");
-	}
-}
-void conv2Bool(expression *e)
-{
-	if ((e->type)->basetp != tp_bool)
-	{
-		(e->type) = new symbolType(tp_bool);
-		e->falselist = makelist(next_instr);
-		glob_quad.emit(Q_IF_EQUAL, e->loc->name, "0", "-1");
-		e->truelist = makelist(next_instr);
-		glob_quad.emit(Q_GOTO, -1);
-	}
-}
-
-int main()
-{
-	symdata *temp_printi = new symdata("printi");
-	temp_printi->tp_n = new symbolType(tp_int);
-	temp_printi->var_type = "func";
-	temp_printi->nest_tab = glob_st;
-	glob_st->symbol_tab.pb(temp_printi);
-
-	symdata *temp_readi = new symdata("readi");
-	temp_readi->tp_n = new symbolType(tp_int);
-	temp_readi->var_type = "func";
-	temp_readi->nest_tab = glob_st;
-	glob_st->symbol_tab.pb(temp_readi);
-
-	symdata *temp_prints = new symdata("prints");
-	temp_prints->tp_n = new symbolType(tp_int);
-	temp_prints->var_type = "func";
-	temp_prints->nest_tab = glob_st;
-	glob_st->symbol_tab.pb(temp_prints);
-	yyparse();
-	glob_st->name = "Global";
-	printf("==============================================================================");
-	printf("\nGenerated Quads for the program\n");
-	glob_quad.print();
-	printf("==============================================================================\n");
-	printf("Symbol table Maintained For the Given Program\n");
-	glob_st->print();
-	set<string> setty;
-	setty.insert("Global");
-	/*for(int i=0; i<glob_st->symbol_tab.size();i++)
-	{
-		if(((glob_st->symbol_tab[i])->nest_tab)!=NULL)
-		{
-			if(setty.find(((glob_st->symbol_tab[i])->nest_tab)->name)==setty.end())
-		{
-			((glob_st->symbol_tab[i])->nest_tab)->print();
-			setty.insert(((glob_st->symbol_tab[i])->nest_tab)->name);
-			//printf("%s\n",((glob_st->symbol_tab[i])->nest_tab)->name.c_str() );
-		}
-	}
-	}*/
-	printf("=============================================================================\n");
-	FILE *fp;
-	fp = fopen("output.s", "w");
-	fprintf(fp, "\t.file\t\"output.s\"\n");
-	//Print the data of the strings here
-	for (int i = 0; i < strings_label.size(); ++i)
-	{
-		fprintf(fp, "\n.STR%d:\t.string %s", i, strings_label[i].c_str());
-	}
-	set<string> setty_1;
-	glob_st->mark_labels();
-	glob_st->global_variables(fp);
-	setty_1.insert("Global");
-	int count_l = 0;
-	for (int i = 0; i < glob_st->symbol_tab.size(); ++i)
-	{
-		if (((glob_st->symbol_tab[i])->nest_tab) != NULL)
-		{
-			if (setty_1.find(((glob_st->symbol_tab[i])->nest_tab)->name) == setty_1.end())
-			{
-				glob_st->symbol_tab[i]->nest_tab->assign_offset();
-				glob_st->symbol_tab[i]->nest_tab->print();
-				glob_st->symbol_tab[i]->nest_tab->function_prologue(fp, count_l);
-				glob_st->symbol_tab[i]->nest_tab->function_restore(fp);
-				glob_st->symbol_tab[i]->nest_tab->gen_internal_code(fp, count_l);
-				setty_1.insert(((glob_st->symbol_tab[i])->nest_tab)->name);
-				glob_st->symbol_tab[i]->nest_tab->function_epilogue(fp, count_l, count_l);
-				count_l++;
-			}
-		}
-	}
-	fprintf(fp, "\n");
-	return 0;
+    int count_l = 0;
+    for (int i = 0; i < globalSymbolTable->symbolTabList.size(); ++i) {
+        if (((globalSymbolTable->symbolTabList[i])->nested) != NULL) {
+            if (labelSet.find(((globalSymbolTable->symbolTabList[i])->nested)->name) == labelSet.end()) {
+                globalSymbolTable->symbolTabList[i]->nested->calcOffset();
+                globalSymbolTable->symbolTabList[i]->nested->print();
+                globalSymbolTable->symbolTabList[i]->nested->function_prologue(fp, count_l);
+                globalSymbolTable->symbolTabList[i]->nested->destroyFunction(fp);
+                globalSymbolTable->symbolTabList[i]->nested->generateTargetCode(fp, count_l);
+                labelSet.insert(((globalSymbolTable->symbolTabList[i])->nested)->name);
+                globalSymbolTable->symbolTabList[i]->nested->function_epilogue(fp, count_l, count_l);
+                count_l++;
+            }
+        }
+    }
+    fprintf(fp, "\n");
+    return 0;
 }

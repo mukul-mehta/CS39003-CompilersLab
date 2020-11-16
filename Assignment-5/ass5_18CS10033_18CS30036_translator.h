@@ -30,12 +30,12 @@ using namespace std;
 		`double`   -> 8 bytes
 		`pointer`  -> 4 bytes (Irrespective of type it points to)
 */
-#define __VOID_SIZE			0
-#define __FUNCTION_SIZE		0
-#define __CHARACTER_SIZE 	1
-#define __INTEGER_SIZE 		4
-#define __POINTER_SIZE 		4
-#define __DOUBLE_SIZE 		8
+#define __VOID_SIZE 0
+#define __FUNCTION_SIZE 0
+#define __CHARACTER_SIZE 1
+#define __INTEGER_SIZE 4
+#define __POINTER_SIZE 4
+#define __DOUBLE_SIZE 8
 
 /*
 	Class Declarations
@@ -94,18 +94,17 @@ extern int yyparse();
 	------------------
 */
 class symbol {
-public:
-	string name;
-	symbolType* type;
-	string initValue;
-	int size;
-	int offset;
-	symbolTable* nested;
+   public:
+    string name;
+    symbolType* type;
+    string initValue;
+    int size;
+    int offset;
+    symbolTable* nested;
 
-	symbol(string name, string t="INTEGER", symbolType* ptr = NULL, int width = 0);
-	symbol* update(symbolType* t);
+    symbol(string name, string t = "INTEGER", symbolType* ptr = NULL, int width = 0);
+    symbol* update(symbolType* t);
 };
-
 
 /*
 	class symbolType
@@ -118,11 +117,11 @@ public:
 	------------------
 */
 class symbolType {
-public:
-	string type;
-	symbolType* ptr;
-	int width;
-	symbolType(string type, symbolType* ptr = NULL, int width = 1);
+   public:
+    string type;
+    symbolType* ptr;
+    int width;
+    symbolType(string type, symbolType* ptr = NULL, int width = 1);
 };
 
 /*
@@ -142,16 +141,16 @@ public:
 	------------------
 */
 class symbolTable {
-public:
-	string name;
-	int tempCount;
-	list<symbol> table;
-	symbolTable* parent;
+   public:
+    string name;
+    int tempCount;
+    list<symbol> table;
+    symbolTable* parent;
 
-	symbolTable(string name = "NULL");
-	symbol* lookup(string name);
-	void print();
-	void update();
+    symbolTable(string name = "NULL");
+    symbol* lookup(string name);
+    void print();
+    void update();
 };
 
 /*
@@ -172,17 +171,17 @@ public:
 	Multiple constructors are present for constructor overloading, to instantiate with different argument lists
 */
 class quad {
-public:
-	string op;
-	string arg1;
-	string arg2;
-	string result;
+   public:
+    string op;
+    string arg1;
+    string arg2;
+    string result;
 
-	void print();
+    void print();
 
-	quad(string res, string arg1, string operation = "EQUAL", string arg2 = "");
-	quad(string res, int arg1, string operation = "EQUAL", string arg2 = "");
-	quad(string res, float arg1, string operation = "EQUAL", string arg2 = "");
+    quad(string res, string arg1, string operation = "EQUAL", string arg2 = "");
+    quad(string res, int arg1, string operation = "EQUAL", string arg2 = "");
+    quad(string res, float arg1, string operation = "EQUAL", string arg2 = "");
 };
 
 /*
@@ -196,10 +195,10 @@ public:
 	------------------
 */
 class quadArray {
-public:
-	vector<quad> quads;
+   public:
+    vector<quad> quads;
 
-	void print();
+    void print();
 };
 
 /*
@@ -210,7 +209,7 @@ public:
 	------------------
 */
 struct statement {
-	list<int> nextList;
+    list<int> nextList;
 };
 
 /*
@@ -224,10 +223,10 @@ struct statement {
 	------------------
 */
 struct carray {
-	string cat;
-	symbol* location;
-	symbol* carray;
-	symbolType* type;
+    string cat;
+    symbol* location;
+    symbol* carray;
+    symbolType* type;
 };
 
 /*
@@ -242,11 +241,11 @@ struct carray {
 	------------------
 */
 struct expression {
-	string type;
-	symbol* location;
-	list<int> truelist;
-	list<int> falselist;
-	list<int> nextList;
+    string type;
+    symbol* location;
+    list<int> truelist;
+    list<int> falselist;
+    list<int> nextList;
 };
 
 /*

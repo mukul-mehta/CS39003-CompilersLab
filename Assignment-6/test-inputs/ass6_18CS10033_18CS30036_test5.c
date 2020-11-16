@@ -1,37 +1,38 @@
-int isPrime(int n)
-{
-    // Corner case
-    int i, j;
-    if (n <= 1)
-        return 0;
+// Test code for Bubble sort
 
-    // Check from 2 to n-1
-    for (i = 2; i < n; i++)
-    {
-        j = n % i;
-        // printi(i);
-        // prints(",");
-        // printi(j);
-        if (j == 0)
-            return 0;
-    }
-
-    return 1;
+void swap(int *xp, int *yp) {
+    int temp = *xp;
+    *xp = *yp;
+    *yp = temp;
 }
 
-// Driver Program
-int main()
-{
-    int n, x;
+void bubbleSort(int arr[], int n) {
+    int i, j;
+    for (i = 0; i < n - 1; i++)
+        for (j = 0; j < n - i - 1; j++)
+            if (arr[j] > arr[j + 1])
+                swap(&arr[j], &arr[j + 1]);
+}
+
+void printArray(int arr[], int size) {
+    int i;
+    for (i = 0; i < size; i++) {
+        printInt(arr[i]);
+        printStr(" ");
+    }
+    printStr("\n");
+}
+
+int main() {
+    int arr[100], i, n;
     int err = 1;
-    prints("Program to check prime number\n");
-    prints("Enter a Number: ");
-    n = readi(&err);
-    x = isPrime(n);
-    if (x == 1)
-        prints("\nPrime");
-    else
-        prints("\nNot Prime");
-    prints("\n");
+    printStr("Number of numbers: \n");
+    n = readInt(&err);
+    printStr("Enter the numbers (separated by newlines): \n");
+    for (i = 0; i < n; i++)
+        arr[i] = readInt(&err);
+    bubbleSort(arr, n);
+    printStr("The sorted elements are:\n");
+    printArray(arr, n);
     return 0;
 }
